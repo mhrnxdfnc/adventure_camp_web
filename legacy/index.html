@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adventure Camp Rental</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loginView" class="login-wrap">
+  <form id="loginForm" class="login-card">
+    <div class="brand-mark">⛺</div><p class="eyebrow">RENTAL MANAGEMENT SYSTEM</p><h1>Adventure Camp</h1><p class="muted">Masuk untuk mengelola perlengkapan outdoor.</p>
+    <label>Login sebagai<select id="loginRole"><option>Admin</option><option>Pemilik</option><option>Pelanggan</option></select></label>
+    <label>Username<input id="username" autocomplete="username" required placeholder="Masukkan username"></label>
+    <label>Password<input id="password" type="password" autocomplete="current-password" required placeholder="Masukkan password"></label>
+    <button class="btn primary full" type="submit" id="loginBtn">Masuk</button><p id="loginMessage" class="message"></p>
+    <p class="small muted">Pastikan Apache dan MySQL aktif di XAMPP.</p>
+  </form>
+</div>
+<div id="appView" class="app hidden">
+  <aside class="sidebar"><div class="brand"><span class="brand-mark small-mark">⛺</span><div><b>Adventure Camp</b><small>Rental System</small></div></div><div class="profile"><div class="avatar">AC</div><div><b id="profileName">Pengguna</b><small id="profileRole">Role</small></div></div>
+    <nav id="nav"><button data-page="dashboard" class="nav-item active">▦ <span>Dashboard</span></button><button data-page="alat" class="nav-item">▣ <span>Data Alat</span></button><button data-page="pelanggan" class="nav-item">♙ <span>Pelanggan</span></button><button data-page="penyewaan" class="nav-item">▤ <span>Penyewaan</span></button><button data-page="pembayaran" class="nav-item">◈ <span>Pembayaran</span></button><button data-page="pengembalian" class="nav-item">↩ <span>Pengembalian & Denda</span></button><button data-page="users" class="nav-item">♧ <span>Pengguna</span></button><button data-page="laporan" class="nav-item">▥ <span>Laporan</span></button></nav>
+    <button id="logoutBtn" class="logout">↪ Keluar</button>
+  </aside>
+  <main class="main"><header class="topbar"><div><p class="eyebrow" id="todayLabel">ADVENTURE CAMP RENTAL</p><h2 id="pageTitle">Dashboard</h2></div><button id="refreshBtn" class="btn light">⟳ Muat ulang</button></header><div id="notice" class="notice hidden"></div><section id="content"></section><footer>Adventure Camp Rental <span>•</span> Sistem Manajemen Penyewaan</footer></main>
+</div>
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><p class="eyebrow">FORM DATA</p><h3 id="modalTitle">Tambah Data</h3></div><button id="closeModal" class="icon-btn" type="button">✕</button></div><form id="dataForm"><div id="formFields" class="form-grid"></div><p id="formMessage" class="message"></p><div class="modal-actions"><button type="button" id="cancelModal" class="btn light">Batal</button><button type="submit" class="btn primary">Simpan data</button></div></form></div></div>
+<script src="app.js"></script>
+</body></html>

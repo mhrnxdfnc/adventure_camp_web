@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Pelanggan - Adventure Camp</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f3f7f2;
+            font-family: Arial, sans-serif;
+            color: #263328;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 480px;
+            padding: 32px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 48px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+            color: #28643b;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #68736a;
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 17px;
+            border: 1px solid #d9e1d9;
+            border-radius: 9px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        input:focus, textarea:focus {
+            outline: 2px solid #b7d9bd;
+            border-color: #28643b;
+        }
+
+        button {
+            width: 100%;
+            padding: 13px;
+            background: #28643b;
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+
+        .success {
+            display: block;
+            background: #e8f5e9;
+            color: #205b30;
+        }
+
+        .error {
+            display: block;
+            background: #ffebee;
+            color: #a12626;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 22px;
+            font-size: 14px;
+        }
+
+        a {
+            color: #28643b;
+            font-weight: bold;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #68736a;
+            line-height: 1.5;
+            margin-top: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="card">
+        <div class="logo">⛺</div>
+
+        <h1>Daftar Pelanggan</h1>
+
+        <p class="subtitle">
+            Buat akun Adventure Camp untuk memilih dan menyewa
+            perlengkapan camping.
+        </p>
+
+        <form id="registerForm">
+            <label for="nama">Nama lengkap</label>
+            <input
+                type="text"
+                id="nama"
+                name="nama_pelanggan"
+                maxlength="100"
+                required
+                placeholder="Masukkan nama lengkap"
+            >
+
+            <label for="alamat">Alamat</label>
+            <textarea
+                id="alamat"
+                name="alamat"
+                required
+                placeholder="Masukkan alamat lengkap"
+            ></textarea>
+
+            <label for="telepon">Nomor telepon</label>
+            <input
+                type="tel"
+                id="telepon"
+                name="nomor_telepon"
+                maxlength="20"
+                required
+                placeholder="Contoh: 081234567890"
+            >
+
+            <label for="username">Username</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                minlength="4"
+                maxlength="50"
+                required
+                autocomplete="username"
+                placeholder="Minimal 4 karakter"
+            >
+
+            <label for="password">Password</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                minlength="8"
+                required
+                autocomplete="new-password"
+                placeholder="Minimal 8 karakter"
+            >
+
+            <label for="konfirmasi">Konfirmasi password</label>
+            <input
+                type="password"
+                id="konfirmasi"
+                required
+                autocomplete="new-password"
+                placeholder="Ulangi password"
+            >
+
+            <button type="submit" id="registerButton">
+                Daftar Sekarang
+            </button>
+
+            <div id="message" class="message" role="status"></div>
+        </form>
+
+        <p class="links">
+            Sudah punya akun?
+            <a href="index.html">Login di sini</a>
+        </p>
+
+        <p class="note">
+            Data akun digunakan untuk mengelola pesanan dan riwayat
+            penyewaan Anda. Jangan bagikan password kepada orang lain.
+        </p>
+    </main>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const button = document.getElementById('registerButton');
+        const message = document.getElementById('message');
+
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const password = document.getElementById('password').value;
+            const konfirmasi = document.getElementById('konfirmasi').value;
+
+            if (password !== konfirmasi) {
+                showMessage(
+                    'Konfirmasi password tidak sama.',
+                    false
+                );
+                return;
+            }
+
+            if (password.length < 8) {
+                showMessage(
+                    'Password harus minimal 8 karakter.',
+                    false
+                );
+                return;
+            }
+
+            const data = {
+                nama_pelanggan:
+                    document.getElementById('nama').value.trim(),
+                alamat:
+                    document.getElementById('alamat').value.trim(),
+                nomor_telepon:
+                    document.getElementById('telepon').value.trim(),
+                username:
+                    document.getElementById('username').value.trim(),
+                password: password
+            };
+
+            button.disabled = true;
+            button.textContent = 'Memproses pendaftaran...';
+            message.className = 'message';
+            message.style.display = 'none';
+
+            try {
+                const response = await fetch(
+                    'api_register_pelanggan.php',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || result.status !== 'success') {
+                    throw new Error(
+                        result.message || 'Pendaftaran gagal.'
+                    );
+                }
+
+                showMessage(
+                    'Pendaftaran berhasil! Kamu akan diarahkan ke halaman login.',
+                    true
+                );
+
+                message.className = 'message success';
+                form.reset();
+
+                setTimeout(function () {
+                    window.location.href = 'index.html';
+                }, 2000);
+
+            } catch (error) {
+                showMessage(
+                    error.message ||
+                    'Tidak dapat terhubung ke server.',
+                    false
+                );
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Daftar Sekarang';
+            }
+        });
+
+        function showMessage(text, success) {
+            message.textContent = text;
+            message.className = 'message ' +
+                (success ? 'success' : 'error');
+            message.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
