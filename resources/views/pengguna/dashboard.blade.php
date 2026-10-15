@@ -15,9 +15,9 @@
             </p>
         </div>
         <div class="col-12 col-md-4 mt-3 mt-md-0 text-md-end">
-            <span class="btn btn-light text-success font-weight-bold disabled" title="Katalog alat lengkap akan aktif pada tahap pemesanan">
-                Katalog Alat (Tahap 2)
-            </span>
+            <a href="{{ route('pengguna.katalog.index') }}" class="btn btn-light text-success font-weight-bold">
+                Buka Katalog Alat &rarr;
+            </a>
         </div>
     </div>
 </div>

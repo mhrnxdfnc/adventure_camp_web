@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\UiController;
 
 /*
@@ -33,20 +35,27 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
-// Rute Dashboard Admin (Hanya untuk Role Admin)
+// Rute Dashboard & Pengelolaan Admin (Hanya untuk Role Admin)
 Route::middleware(['auth', 'role:Admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::get('/dashboard', [UiController::class, 'adminDashboard'])->name('dashboard');
+
+        // CRUD Master Data Alat Camping
+        Route::resource('alat', AlatController::class)->parameters(['alat' => 'kode_alat']);
     });
 
-// Rute Dashboard Pengguna (Hanya untuk Role Pengguna / Pelanggan)
+// Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
 Route::middleware(['auth', 'role:Pengguna'])
     ->prefix('pengguna')
     ->name('pengguna.')
     ->group(function () {
         Route::get('/dashboard', [UiController::class, 'penggunaDashboard'])->name('dashboard');
+
+        // Katalog Alat Camping Siap Sewa
+        Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
+        Route::get('/katalog/{kode_alat}', [KatalogController::class, 'show'])->name('katalog.show');
     });
 
 // Rute Dashboard Pemilik (Strictly Read-Only)

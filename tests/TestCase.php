@@ -17,6 +17,7 @@ abstract class TestCase extends BaseTestCase
         if (DB::getDriverName() === 'sqlite') {
             $this->artisan('migrate');
             $this->seedTestUsers();
+            $this->seedTestAlat();
         }
     }
 
@@ -62,6 +63,78 @@ abstract class TestCase extends BaseTestCase
                 'password' => 'pelanggan123',
                 'role' => 'Pelanggan',
                 'status_aktif' => 1,
+            ]);
+        }
+    }
+
+    /**
+     * Sediakan data uji alat camping dan riwayat detail penyewaan
+     */
+    protected function seedTestAlat(): void
+    {
+        if (Schema::hasTable('alat') && \App\Models\Alat::count() === 0) {
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT001',
+                'nama_alat' => 'Tenda Dome 4 Orang',
+                'kategori' => 'Tenda',
+                'stok' => 1,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 50000.00,
+            ]);
+
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT002',
+                'nama_alat' => 'Sleeping Bag',
+                'kategori' => 'Perlengkapan Tidur',
+                'stok' => 4,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 25000.00,
+            ]);
+
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT003',
+                'nama_alat' => 'Carrier 60L',
+                'kategori' => 'Tas',
+                'stok' => 5,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 40000.00,
+            ]);
+
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT004',
+                'nama_alat' => 'Kompor Portable',
+                'kategori' => 'Peralatan Masak',
+                'stok' => 2,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 30000.00,
+            ]);
+
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT005',
+                'nama_alat' => 'Matras Camping',
+                'kategori' => 'Perlengkapan Tidur',
+                'stok' => 7,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 15000.00,
+            ]);
+
+            \App\Models\Alat::create([
+                'kode_alat' => 'ALT006',
+                'nama_alat' => 'Lentera Rusak',
+                'kategori' => 'Penerangan',
+                'stok' => 2,
+                'kondisi' => 'Rusak',
+                'tarif_sewa' => 10000.00,
+            ]);
+        }
+
+        if (Schema::hasTable('detail_penyewaan') && \App\Models\DetailPenyewaan::count() === 0) {
+            \App\Models\DetailPenyewaan::create([
+                'id_detail' => 1,
+                'no_transaksi' => 'TRX-20261005-001',
+                'kode_alat' => 'ALT001',
+                'jumlah' => 1,
+                'tarif_sewa' => 50000.00,
             ]);
         }
     }
