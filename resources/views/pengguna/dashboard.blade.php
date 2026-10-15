@@ -9,7 +9,7 @@
     <div class="row align-items-center">
         <div class="col-12 col-md-8">
             <span class="badge bg-white text-success mb-2" style="font-size:0.75rem;">Area Pelanggan</span>
-            <h2 class="font-weight-bold mb-2">Halo, Pelanggan Camping! 👋</h2>
+            <h2 class="font-weight-bold mb-2">Halo, {{ Auth::user()->nama_user ?? 'Pelanggan Camping' }}! 👋</h2>
             <p class="mb-0 text-white-50" style="font-size:0.95rem;">
                 Pantau pesanan alat outdoor kamu, cek tagihan sewa, dan konfirmasi pembayaran dengan mudah.
             </p>
