@@ -1,13 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UiController;
 
 /*
 |--------------------------------------------------------------------------
 | Web Routes — Adventure Camp Rental
 |--------------------------------------------------------------------------
-| Rute fondasi antarmuka dan layout dashboard.
+| Pengaturan rute publik, autentikasi tiga role, dan proteksi otorisasi.
 */
 
 // Beranda mengarahkan ke showcase komponen UI
@@ -15,21 +16,48 @@ Route::get('/', function () {
     return redirect('/ui-showcase');
 });
 
-// Fondasi Halaman Login
-Route::get('/login', [UiController::class, 'login'])->name('login');
-
-// Showcase Seluruh Komponen Antarmuka & State
+// Showcase Komponen UI (Publik untuk pengujian tampilan)
 Route::get('/ui-showcase', [UiController::class, 'showcase'])->name('ui.showcase');
 
-// Layout Dashboard Masing-Masing Role
-Route::prefix('admin')->group(function () {
-    Route::get('/dashboard', [UiController::class, 'adminDashboard'])->name('admin.dashboard');
+// Rute Autentikasi (Tamu)
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+
+    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
 });
 
-Route::prefix('pengguna')->group(function () {
-    Route::get('/dashboard', [UiController::class, 'penggunaDashboard'])->name('pengguna.dashboard');
-});
+// Rute Keluar Sistem (Terotentikasi)
+Route::post('/logout', [AuthController::class, 'logout'])
+    ->middleware('auth')
+    ->name('logout');
 
-Route::prefix('pemilik')->group(function () {
-    Route::get('/dashboard', [UiController::class, 'pemilikDashboard'])->name('pemilik.dashboard');
-});
+// Rute Dashboard Admin (Hanya untuk Role Admin)
+Route::middleware(['auth', 'role:Admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/dashboard', [UiController::class, 'adminDashboard'])->name('dashboard');
+    });
+
+// Rute Dashboard Pengguna (Hanya untuk Role Pengguna / Pelanggan)
+Route::middleware(['auth', 'role:Pengguna'])
+    ->prefix('pengguna')
+    ->name('pengguna.')
+    ->group(function () {
+        Route::get('/dashboard', [UiController::class, 'penggunaDashboard'])->name('dashboard');
+    });
+
+// Rute Dashboard Pemilik (Strictly Read-Only)
+Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
+    ->prefix('pemilik')
+    ->name('pemilik.')
+    ->group(function () {
+        Route::get('/dashboard', [UiController::class, 'pemilikDashboard'])->name('dashboard');
+
+        // Endpoint pengujian pencegahan perubahan data oleh Pemilik
+        Route::post('/test-action', function () {
+            return response()->json(['message' => 'Should not be accessible by Pemilik']);
+        })->name('test-action');
+    });

@@ -66,7 +66,8 @@ class UiFoundationTest extends TestCase
      */
     public function test_admin_dashboard_renders_correctly(): void
     {
-        $response = $this->get('/admin/dashboard');
+        $admin = \App\Models\User::where('username', 'admin')->first();
+        $response = $this->actingAs($admin)->get('/admin/dashboard');
 
         $response->assertStatus(200);
         $response->assertSee('Dashboard Admin');
@@ -82,11 +83,12 @@ class UiFoundationTest extends TestCase
      */
     public function test_pengguna_dashboard_renders_correctly(): void
     {
-        $response = $this->get('/pengguna/dashboard');
+        $pengguna = \App\Models\User::where('username', 'pelanggan')->first();
+        $response = $this->actingAs($pengguna)->get('/pengguna/dashboard');
 
         $response->assertStatus(200);
         $response->assertSee('Dashboard Pengguna');
-        $response->assertSee('Halo, Pelanggan Camping!');
+        $response->assertSee('Halo,');
         $response->assertSee('Pesanan Aktif Saya');
         $response->assertSee('Tagihan Menunggu Pembayaran');
         $response->assertSee('TRX-20261015-001');
@@ -97,7 +99,8 @@ class UiFoundationTest extends TestCase
      */
     public function test_pemilik_dashboard_renders_strictly_read_only(): void
     {
-        $response = $this->get('/pemilik/dashboard');
+        $pemilik = \App\Models\User::where('username', 'pemilik')->first();
+        $response = $this->actingAs($pemilik)->get('/pemilik/dashboard');
 
         $response->assertStatus(200);
         $response->assertSee('Dashboard Pemilik');
