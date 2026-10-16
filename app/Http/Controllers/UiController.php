@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alat;
+use App\Models\Pembayaran;
 use App\Models\Penyewaan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -29,7 +31,23 @@ class UiController extends Controller
      */
     public function adminDashboard(): View
     {
-        return view('admin.dashboard');
+        $pesananMenunggu = Penyewaan::with(['pelanggan', 'detailPenyewaan.alat'])
+            ->where('status_penyewaan', 'Menunggu Konfirmasi')
+            ->orderBy('tanggal_sewa', 'asc')
+            ->get();
+
+        $countMenungguKonfirmasi = $pesananMenunggu->count();
+        $countMenungguPembayaran = Pembayaran::where('status_pembayaran', 'Menunggu Verifikasi')->count();
+        $countSedangDisewa = Penyewaan::whereIn('status_penyewaan', ['Sedang Disewa', 'Berjalan'])->count();
+        $totalStokFisik = (int) Alat::sum('stok');
+
+        return view('admin.dashboard', [
+            'pesananMenunggu' => $pesananMenunggu,
+            'countMenungguKonfirmasi' => $countMenungguKonfirmasi,
+            'countMenungguPembayaran' => $countMenungguPembayaran,
+            'countSedangDisewa' => $countSedangDisewa,
+            'totalStokFisik' => $totalStokFisik,
+        ]);
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminPembayaranController;
+use App\Http\Controllers\AdminPesananController;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventarisController;
@@ -51,6 +52,10 @@ Route::middleware(['auth', 'role:Admin'])
 
         // CRUD Master Data Alat Camping
         Route::resource('alat', AlatController::class)->parameters(['alat' => 'kode_alat']);
+
+        // Persetujuan & Penolakan Pengajuan Pesanan
+        Route::post('/pesanan/{no_transaksi}/setujui', [AdminPesananController::class, 'setujui'])->name('pesanan.setujui');
+        Route::post('/pesanan/{no_transaksi}/tolak', [AdminPesananController::class, 'tolak'])->name('pesanan.tolak');
 
         // Verifikasi Pembayaran Transaksi
         Route::get('/pembayaran', [AdminPembayaranController::class, 'index'])->name('pembayaran.index');

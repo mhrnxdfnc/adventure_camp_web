@@ -336,6 +336,22 @@ class OperasionalController extends Controller
                     $denda->nominal_denda = $nominalDenda;
                     $denda->alasan_denda = $alasanDenda;
                     $denda->save();
+
+                    ActivityLog::record(
+                        Auth::id(),
+                        'Pencatatan Denda',
+                        'Denda',
+                        "No Transaksi: {$trx->no_transaksi}, Nominal: Rp ".number_format($nominalDenda, 0, ',', '.').", Alasan: {$alasanDenda}"
+                    );
+                }
+
+                if ($adaKerusakan) {
+                    ActivityLog::record(
+                        Auth::id(),
+                        'Perubahan Kondisi Alat',
+                        'Inventaris',
+                        "Perubahan kondisi alat pada pengembalian {$trx->no_transaksi}: {$kondisiTeks}"
+                    );
                 }
 
                 // Ubah status pesanan menjadi Selesai

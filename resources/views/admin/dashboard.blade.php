@@ -14,7 +14,7 @@
                     ⏳
                 </div>
             </div>
-            <div class="ac-stat-value">3</div>
+            <div class="ac-stat-value">{{ $countMenungguKonfirmasi ?? 3 }}</div>
             <div class="ac-stat-sub">Menunggu konfirmasi admin</div>
         </div>
     </div>
@@ -29,7 +29,7 @@
                         💳
                     </div>
                 </div>
-                <div class="ac-stat-value">1</div>
+                <div class="ac-stat-value">{{ $countMenungguPembayaran ?? 1 }}</div>
                 <div class="ac-stat-sub">Bukti transfer belum diperiksa</div>
             </div>
         </a>
@@ -44,7 +44,7 @@
                     ⛺
                 </div>
             </div>
-            <div class="ac-stat-value">4</div>
+            <div class="ac-stat-value">{{ $countSedangDisewa ?? 4 }}</div>
             <div class="ac-stat-sub">Transaksi aktif di lapangan</div>
         </div>
     </div>
@@ -58,7 +58,7 @@
                     📦
                 </div>
             </div>
-            <div class="ac-stat-value">28</div>
+            <div class="ac-stat-value">{{ $totalStokFisik ?? 28 }}</div>
             <div class="ac-stat-sub">Unit total dalam inventaris</div>
         </div>
     </div>
@@ -82,44 +82,111 @@
         </tr>
     </thead>
     <tbody>
-        <tr>
-            <td><strong>TRX-20261015-001</strong></td>
-            <td>Andi Pratama</td>
-            <td>16 Okt 2026 &rarr; 18 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-            <td>Tenda Dome 4P (1), Sleeping Bag (2)</td>
-            <td>Rp 200.000</td>
-            <td><x-status-badge status="Menunggu Konfirmasi" /></td>
-            <td>
-                <!-- Sesuai aturan: tidak ada tombol palsu yang pura-pura bekerja -->
-                <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi persetujuan akan diaktifkan pada implementasi alur bisnis">
-                    Tinjau (Tahap 2)
-                </button>
-            </td>
-        </tr>
-        <tr>
-            <td><strong>TRX-20261014-003</strong></td>
-            <td>Siti Aulia</td>
-            <td>15 Okt 2026 &rarr; 17 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-            <td>Carrier 60L (2)</td>
-            <td>Rp 160.000</td>
-            <td><x-status-badge status="Sedang Disewa" /></td>
-            <td>
-                <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi pengembalian akan diaktifkan pada implementasi alur bisnis">
-                    Proses (Tahap 2)
-                </button>
-            </td>
-        </tr>
-        <tr>
-            <td><strong>TRX-20261012-002</strong></td>
-            <td>Budi Santoso</td>
-            <td>12 Okt 2026 &rarr; 14 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-            <td>Kompor Portable (1), Nesting (1)</td>
-            <td>Rp 70.000</td>
-            <td><x-status-badge status="Selesai" /></td>
-            <td>
-                <span class="text-muted small">Selesai</span>
-            </td>
-        </tr>
+        @if(isset($pesananMenunggu) && $pesananMenunggu->isNotEmpty())
+            @foreach($pesananMenunggu as $trx)
+                <tr>
+                    <td><strong>{{ $trx->no_transaksi }}</strong></td>
+                    <td>{{ $trx->pelanggan?->nama_pelanggan ?? 'Pelanggan #' . $trx->id_pelanggan }}</td>
+                    <td>
+                        {{ \Carbon\Carbon::parse($trx->tanggal_sewa)->format('d M Y') }} &rarr; {{ \Carbon\Carbon::parse($trx->tanggal_kembali)->format('d M Y') }}
+                        <small class="text-muted d-block">({{ $trx->durasi_hari }} hari)</small>
+                    </td>
+                    <td>
+                        @if($trx->detailPenyewaan->isNotEmpty())
+                            {{ $trx->detailPenyewaan->map(fn($d) => ($d->alat?->nama_alat ?? $d->kode_alat).' ('.$d->jumlah.')')->join(', ') }}
+                        @else
+                            <span class="text-muted">-</span>
+                        @endif
+                    </td>
+                    <td>Rp {{ number_format($trx->total_biaya, 0, ',', '.') }}</td>
+                    <td><x-status-badge :status="$trx->status_penyewaan" /></td>
+                    <td>
+                        <div class="d-flex gap-1 align-items-center">
+                            <form action="{{ route('admin.pesanan.setujui', $trx->no_transaksi) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menyetujui pesanan {{ $trx->no_transaksi }}?');">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    ✓ Setujui
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalTolakPesanan{{ str_replace('-', '', $trx->no_transaksi) }}">
+                                ✕ Tolak
+                            </button>
+                        </div>
+
+                        <!-- Modal Tolak Pesanan -->
+                        <div class="modal fade" id="modalTolakPesanan{{ str_replace('-', '', $trx->no_transaksi) }}" tabindex="-1" aria-labelledby="modalTolakPesananLabel{{ str_replace('-', '', $trx->no_transaksi) }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <form action="{{ route('admin.pesanan.tolak', $trx->no_transaksi) }}" method="POST">
+                                    @csrf
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title h6 font-weight-bold" id="modalTolakPesananLabel{{ str_replace('-', '', $trx->no_transaksi) }}">
+                                                Tolak Pesanan {{ $trx->no_transaksi }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-start">
+                                            <div class="mb-3">
+                                                <label class="form-label font-weight-bold">Alasan Penolakan <span class="text-danger">*</span></label>
+                                                <textarea name="alasan_penolakan" class="form-control" rows="3" required placeholder="Contoh: Stok alat tidak mencukupi untuk periode tanggal yang diminta..."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                            <button type="submit" class="btn btn-sm btn-danger">Konfirmasi Tolak Pesanan</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            @endforeach
+        @elseif(isset($pesananMenunggu))
+            <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    Tidak ada pesanan masuk yang menunggu konfirmasi saat ini.
+                </td>
+            </tr>
+        @else
+            <tr>
+                <td><strong>TRX-20261015-001</strong></td>
+                <td>Andi Pratama</td>
+                <td>16 Okt 2026 &rarr; 18 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
+                <td>Tenda Dome 4P (1), Sleeping Bag (2)</td>
+                <td>Rp 200.000</td>
+                <td><x-status-badge status="Menunggu Konfirmasi" /></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi persetujuan akan diaktifkan pada implementasi alur bisnis">
+                        Tinjau (Tahap 2)
+                    </button>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>TRX-20261014-003</strong></td>
+                <td>Siti Aulia</td>
+                <td>15 Okt 2026 &rarr; 17 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
+                <td>Carrier 60L (2)</td>
+                <td>Rp 160.000</td>
+                <td><x-status-badge status="Sedang Disewa" /></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi pengembalian akan diaktifkan pada implementasi alur bisnis">
+                        Proses (Tahap 2)
+                    </button>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>TRX-20261012-002</strong></td>
+                <td>Budi Santoso</td>
+                <td>12 Okt 2026 &rarr; 14 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
+                <td>Kompor Portable (1), Nesting (1)</td>
+                <td>Rp 70.000</td>
+                <td><x-status-badge status="Selesai" /></td>
+                <td>
+                    <span class="text-muted small">Selesai</span>
+                </td>
+            </tr>
+        @endif
     </tbody>
 </x-data-table>
 

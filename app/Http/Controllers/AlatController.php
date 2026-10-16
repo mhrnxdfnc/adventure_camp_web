@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Alat;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class AlatController extends Controller
@@ -156,6 +155,8 @@ class AlatController extends Controller
             'tarif_sewa.min' => 'Tarif sewa harus lebih besar dari 0 Rupiah.',
         ]);
 
+        $oldKondisi = $alat->kondisi;
+
         $alat->update([
             'nama_alat' => $validated['nama_alat'],
             'kategori' => $validated['kategori'],
@@ -163,6 +164,15 @@ class AlatController extends Controller
             'kondisi' => $validated['kondisi'],
             'tarif_sewa' => (float) $validated['tarif_sewa'],
         ]);
+
+        if ($oldKondisi !== $validated['kondisi']) {
+            ActivityLog::record(
+                Auth::id() ?? 1,
+                'Perubahan Kondisi Alat',
+                'Alat',
+                "Kode Alat: {$alat->kode_alat}, Nama: {$alat->nama_alat}, Kondisi diubah: {$oldKondisi} -> {$validated['kondisi']}"
+            );
+        }
 
         $this->logActivity("Perbarui alat: {$alat->kode_alat}", $alat->nama_alat);
 
@@ -203,17 +213,6 @@ class AlatController extends Controller
      */
     protected function logActivity(string $aktivitas, string $data): void
     {
-        try {
-            if (Schema::hasTable('activity_logs')) {
-                DB::table('activity_logs')->insert([
-                    'id_user' => Auth::id() ?? 1,
-                    'aktivitas' => $aktivitas,
-                    'modul' => 'Alat',
-                    'data_diproses' => $data,
-                    'waktu' => now(),
-                ]);
-            }
-        } catch (\Throwable $ignored) {
-        }
+        ActivityLog::record(Auth::id() ?? 1, $aktivitas, 'Alat', $data);
     }
 }
