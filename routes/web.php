@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminLogController;
 use App\Http\Controllers\AdminPembayaranController;
 use App\Http\Controllers\AdminPesananController;
 use App\Http\Controllers\AlatController;
@@ -84,6 +85,9 @@ Route::middleware(['auth', 'role:Admin'])
 
         Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
         Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
+
+        // Audit Trail & Riwayat Log Aktivitas Sistem (Admin Only)
+        Route::get('/logs', [AdminLogController::class, 'index'])->name('logs.index');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
