@@ -9,6 +9,7 @@ use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PembelianInventarisController;
 use App\Http\Controllers\PemilikDashboardController;
+use App\Http\Controllers\PemilikTransaksiController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
 
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
     ->name('pemilik.')
     ->group(function () {
         Route::get('/dashboard', [PemilikDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/transaksi', [PemilikTransaksiController::class, 'index'])->name('transaksi.index');
 
         // Endpoint pengujian pencegahan perubahan data oleh Pemilik
         Route::post('/test-action', function () {
