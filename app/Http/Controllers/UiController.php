@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Penyewaan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class UiController extends Controller
@@ -36,7 +37,34 @@ class UiController extends Controller
      */
     public function penggunaDashboard(): View
     {
-        return view('pengguna.dashboard');
+        $user = Auth::user();
+        $pelangganId = $user->id_pelanggan;
+
+        $pesananList = Penyewaan::with(['pelanggan', 'pembayaran', 'detailPenyewaan.alat', 'pengambilan', 'pengembalian.denda'])
+            ->where(function ($query) use ($user, $pelangganId) {
+                if ($pelangganId) {
+                    $query->where('id_pelanggan', $pelangganId);
+                }
+                $query->orWhere('id_user', $user->id_user);
+            })
+            ->orderBy('tanggal_sewa', 'desc')
+            ->get();
+
+        $pesananAktifCount = $pesananList->filter(function ($trx) {
+            return in_array($trx->status_penyewaan, ['Menunggu Pembayaran', 'Disetujui', 'Siap Diambil', 'Sedang Disewa', 'Berjalan'], true);
+        })->count();
+
+        $tagihanMenunggu = (float) $pesananList->filter(function ($trx) {
+            return ! $trx->pembayaran || ! $trx->pembayaran->isLunas();
+        })->sum(function ($trx) {
+            return $trx->total_biaya;
+        });
+
+        return view('pengguna.dashboard', [
+            'pesananList' => $pesananList,
+            'pesananAktifCount' => $pesananAktifCount,
+            'tagihanMenunggu' => $tagihanMenunggu,
+        ]);
     }
 
     /**
