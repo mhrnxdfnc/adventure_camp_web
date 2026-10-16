@@ -8,6 +8,7 @@ use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PembelianInventarisController;
+use App\Http\Controllers\PemilikDashboardController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
 
@@ -107,7 +108,7 @@ Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
     ->prefix('pemilik')
     ->name('pemilik.')
     ->group(function () {
-        Route::get('/dashboard', [UiController::class, 'pemilikDashboard'])->name('dashboard');
+        Route::get('/dashboard', [PemilikDashboardController::class, 'index'])->name('dashboard');
 
         // Endpoint pengujian pencegahan perubahan data oleh Pemilik
         Route::post('/test-action', function () {
