@@ -90,6 +90,25 @@ class Penyewaan extends Model
     }
 
     /**
+     * Generate format nomor transaksi TRX-YYYYMMDD-001
+     */
+    public static function generateNoTransaksi(): string
+    {
+        $datePrefix = 'TRX-'.date('Ymd');
+        $latest = self::where('no_transaksi', 'like', "{$datePrefix}-%")
+            ->orderBy('no_transaksi', 'desc')
+            ->value('no_transaksi');
+
+        $sequence = 1;
+        if ($latest) {
+            $parts = explode('-', $latest);
+            $sequence = ((int) end($parts)) + 1;
+        }
+
+        return "{$datePrefix}-".str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
      * Total tagihan dihitung dari SUM(jumlah * tarif_sewa * durasi_hari)
      */
     public function getTotalBiayaAttribute(): float

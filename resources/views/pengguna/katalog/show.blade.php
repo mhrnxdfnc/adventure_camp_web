@@ -90,16 +90,120 @@
                         </div>
                     </div>
 
-                    <!-- Tombol booking (akan dihubungkan ke alur pesanan pada tahap berikutnya) -->
-                    <button type="button" class="btn btn-ac-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 disabled" title="Formulir pemesanan lengkap akan aktif pada tahap selanjutnya">
-                        <span>Pesan Alat Ini (Tahap 2)</span>
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                        </svg>
-                    </button>
-                    <small class="text-muted d-block text-center mt-2" style="font-size:0.75rem;">
-                        Fitur checkout formulir pemesanan akan diaktifkan pada tahap pemesanan.
-                    </small>
+                    <form action="{{ route('pengguna.pesanan.store') }}" method="POST" id="formPemesananAlat">
+                        @csrf
+                        <input type="hidden" name="kode_alat" value="{{ $alat->kode_alat }}">
+
+                        <!-- Input Jumlah Unit -->
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold small d-flex justify-content-between">
+                                <span>Jumlah Unit Disewa <span class="text-danger">*</span></span>
+                                <span class="text-muted fw-normal">Maks. {{ $alat->stok }} unit</span>
+                            </label>
+                            <div class="input-group">
+                                <button type="button" class="btn btn-outline-secondary" onclick="ubahJumlah(-1)">-</button>
+                                <input type="number" name="jumlah" id="inputJumlah" class="form-control text-center font-weight-bold" value="1" min="1" max="{{ $alat->stok }}" required onchange="hitungRingkasan()">
+                                <button type="button" class="btn btn-outline-secondary" onclick="ubahJumlah(1)">+</button>
+                            </div>
+                            @error('jumlah')
+                                <small class="text-danger d-block mt-1">{{ $message }}</small>
+                            @enderror
+                        </div>
+
+                        <!-- Periode Sewa -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label font-weight-bold small">Mulai Sewa <span class="text-danger">*</span></label>
+                                <input type="date" name="tanggal_sewa" id="tanggalSewa" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required onchange="hitungRingkasan()">
+                                @error('tanggal_sewa')
+                                    <small class="text-danger d-block mt-1">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label font-weight-bold small">Kembali <span class="text-danger">*</span></label>
+                                <input type="date" name="tanggal_kembali" id="tanggalKembali" class="form-control form-control-sm" value="{{ date('Y-m-d', strtotime('+1 day')) }}" min="{{ date('Y-m-d', strtotime('+1 day')) }}" required onchange="hitungRingkasan()">
+                                @error('tanggal_kembali')
+                                    <small class="text-danger d-block mt-1">{{ $message }}</small>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <!-- Pilihan Metode Pembayaran -->
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold small">Pilihan Metode Pembayaran <span class="text-danger">*</span></label>
+                            <select name="metode_pembayaran" class="form-select form-select-sm" required>
+                                <option value="QRIS" selected>QRIS (Kasir Basecamp)</option>
+                                <option value="Transfer Bank">Transfer Bank Resmi</option>
+                                <option value="Cash">Tunai / Cash di Basecamp</option>
+                            </select>
+                            @error('metode_pembayaran')
+                                <small class="text-danger d-block mt-1">{{ $message }}</small>
+                            @enderror
+                        </div>
+
+                        <!-- Ringkasan Biaya Transaksi -->
+                        <div class="p-3 bg-light rounded-3 mb-3 border">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span>Durasi Sewa:</span>
+                                <span id="labelDurasi" class="fw-bold text-dark">1 Hari</span>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted mb-2">
+                                <span>Kalkulasi:</span>
+                                <span id="labelKalkulasi" class="font-monospace">1 &times; {{ $alat->formatted_tarif }} &times; 1 hari</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <strong class="small">Estimasi Tagihan:</strong>
+                                <strong class="text-success" style="font-size:1.2rem;" id="labelTotal">
+                                    {{ $alat->formatted_tarif }}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Submit Lanjutkan Pesanan -->
+                        <button type="submit" class="btn btn-ac-primary w-100 py-2.5 font-weight-bold d-flex align-items-center justify-content-center gap-2">
+                            <span>Lanjutkan Pesanan</span>
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
+                        </button>
+                        <small class="text-muted d-block text-center mt-2" style="font-size:0.75rem;">
+                            Pesanan akan diperiksa ketersediaan stoknya oleh Admin sebelum instruksi pembayaran diterbitkan.
+                        </small>
+                    </form>
+
+                    <script>
+                        const tarifPerHari = {{ (float) $alat->tarif_sewa }};
+                        const maxStok = {{ (int) $alat->stok }};
+
+                        function ubahJumlah(delta) {
+                            const input = document.getElementById('inputJumlah');
+                            let val = parseInt(input.value) || 1;
+                            val = Math.max(1, Math.min(maxStok, val + delta));
+                            input.value = val;
+                            hitungRingkasan();
+                        }
+
+                        function hitungRingkasan() {
+                            const jumlah = parseInt(document.getElementById('inputJumlah').value) || 1;
+                            const sewaStr = document.getElementById('tanggalSewa').value;
+                            const kembaliStr = document.getElementById('tanggalKembali').value;
+
+                            let durasi = 1;
+                            if (sewaStr && kembaliStr) {
+                                const d1 = new Date(sewaStr);
+                                const d2 = new Date(kembaliStr);
+                                const diffTime = d2 - d1;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                durasi = Math.max(1, diffDays);
+                            }
+
+                            const total = tarifPerHari * jumlah * durasi;
+
+                            document.getElementById('labelDurasi').textContent = durasi + ' Hari';
+                            document.getElementById('labelKalkulasi').textContent = jumlah + ' × Rp ' + tarifPerHari.toLocaleString('id-ID') + ' × ' + durasi + ' hr';
+                            document.getElementById('labelTotal').textContent = 'Rp ' + total.toLocaleString('id-ID');
+                        }
+                    </script>
                 @else
                     <div class="alert alert-warning py-3 px-3 mb-0 small" style="border-radius:8px;">
                         <strong>Perhatian:</strong> Peralatan ini sedang tidak tersedia untuk disewa (stok habis atau sedang dalam pemeliharaan).

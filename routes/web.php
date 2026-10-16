@@ -12,6 +12,7 @@ use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PembelianInventarisController;
 use App\Http\Controllers\PemilikDashboardController;
 use App\Http\Controllers\PemilikTransaksiController;
+use App\Http\Controllers\PenggunaPesananController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
 
@@ -100,6 +101,9 @@ Route::middleware(['auth', 'role:Pengguna'])
         // Katalog Alat Camping Siap Sewa
         Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
         Route::get('/katalog/{kode_alat}', [KatalogController::class, 'show'])->name('katalog.show');
+
+        // Pengajuan Pesanan Penyewaan Alat Camping
+        Route::post('/pesanan', [PenggunaPesananController::class, 'store'])->name('pesanan.store');
 
         // Halaman Instruksi Pembayaran Pesanan Disetujui
         Route::get('/pembayaran/{no_transaksi}/qris', [PembayaranController::class, 'showQris'])->name('pembayaran.qris');
