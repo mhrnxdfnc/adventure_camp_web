@@ -170,13 +170,30 @@
             </div>
         @endauth
 
-        <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul inventaris selesai">
-            <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-            </svg>
-            <span>Inventaris</span>
-            <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
-        </div>
+        @auth
+            @if(Auth::user()->isAdmin())
+                <a href="{{ route('admin.inventaris.index') }}" class="ac-menu-item {{ request()->is('admin/inventaris*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <span>Inventaris & Stok</span>
+                </a>
+            @else
+                <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Inventaris dikelola oleh Admin">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <span>Inventaris</span>
+                </div>
+            @endif
+        @else
+            <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Inventaris dikelola oleh Admin">
+                <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                </svg>
+                <span>Inventaris</span>
+            </div>
+        @endauth
     </nav>
 
     <!-- Sidebar Footer -->

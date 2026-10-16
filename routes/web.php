@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminPembayaranController;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\InventarisController;
 use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
@@ -62,6 +63,11 @@ Route::middleware(['auth', 'role:Admin'])
         Route::get('/pengembalian', [OperasionalController::class, 'pengembalianIndex'])->name('operasional.pengembalian');
         Route::get('/pengembalian/{no_transaksi}', [OperasionalController::class, 'formPengembalian'])->name('operasional.form-pengembalian');
         Route::post('/pengembalian/{no_transaksi}', [OperasionalController::class, 'prosesPengembalian'])->name('operasional.proses-pengembalian');
+
+        // Modul Inventaris & Pemantauan Stok
+        Route::get('/inventaris', [InventarisController::class, 'index'])->name('inventaris.index');
+        Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
+        Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
