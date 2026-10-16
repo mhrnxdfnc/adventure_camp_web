@@ -111,6 +111,7 @@ Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
     ->group(function () {
         Route::get('/dashboard', [PemilikDashboardController::class, 'index'])->name('dashboard');
         Route::get('/transaksi', [PemilikTransaksiController::class, 'index'])->name('transaksi.index');
+        Route::get('/transaksi/{no_transaksi}', [PemilikTransaksiController::class, 'show'])->name('transaksi.show');
 
         // Endpoint pengujian pencegahan perubahan data oleh Pemilik
         Route::post('/test-action', function () {

@@ -67,7 +67,7 @@
                                 <x-status-badge :status="$trx->status_penyewaan" />
                             </td>
                             <td class="text-center pe-4">
-                                <a href="{{ url('/pemilik/transaksi/' . $trx->no_transaksi) }}" class="btn btn-sm btn-outline-primary" style="font-size: 0.8rem;">
+                                <a href="{{ route('pemilik.transaksi.show', $trx->no_transaksi) }}" class="btn btn-sm btn-outline-primary" style="font-size: 0.8rem;">
                                     🔍 Lihat Rincian
                                 </a>
                             </td>

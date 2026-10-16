@@ -21,4 +21,23 @@ class PemilikTransaksiController extends Controller
             'transaksiList' => $transaksiList,
         ]);
     }
+
+    /**
+     * Tampilkan rincian lengkap transaksi penyewaan pelanggan untuk Pemilik (Strictly Read-Only).
+     */
+    public function show(string $no_transaksi): View
+    {
+        $penyewaan = Penyewaan::with([
+            'pelanggan',
+            'pembayaran.admin',
+            'detailPenyewaan.alat',
+            'pengambilan.admin',
+            'pengembalian.admin',
+            'pengembalian.denda',
+        ])->where('no_transaksi', $no_transaksi)->firstOrFail();
+
+        return view('pemilik.transaksi.show', [
+            'penyewaan' => $penyewaan,
+        ]);
+    }
 }
