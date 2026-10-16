@@ -66,6 +66,7 @@ Route::middleware(['auth', 'role:Admin'])
 
         // Modul Inventaris & Pemantauan Stok
         Route::get('/inventaris', [InventarisController::class, 'index'])->name('inventaris.index');
+        Route::get('/inventaris/riwayat', [InventarisController::class, 'riwayatIndex'])->name('inventaris.riwayat');
         Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
         Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
     });

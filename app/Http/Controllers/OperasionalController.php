@@ -8,6 +8,7 @@ use App\Models\Denda;
 use App\Models\Pengambilan;
 use App\Models\Pengembalian;
 use App\Models\Penyewaan;
+use App\Models\RiwayatStok;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -114,8 +115,20 @@ class OperasionalController extends Controller
                     // Kurangi stok fisik alat saat serah terima
                     $alat = Alat::where('kode_alat', $detail->kode_alat)->lockForUpdate()->first();
                     if ($alat) {
-                        $alat->stok = max(0, $alat->stok - $detail->jumlah_diserahkan);
+                        $stokSebelum = (int) $alat->stok;
+                        $stokSesudah = max(0, $alat->stok - $detail->jumlah_diserahkan);
+                        $alat->stok = $stokSesudah;
                         $alat->save();
+
+                        RiwayatStok::recordChange(
+                            $detail->kode_alat,
+                            'Serah Terima Sewa',
+                            $stokSebelum,
+                            -$detail->jumlah_diserahkan,
+                            $stokSesudah,
+                            "Penyerahan sewa pesanan {$trx->no_transaksi} kepada {$pengambilan->nama_penerima}",
+                            Auth::id()
+                        );
                     }
                 }
 
@@ -274,14 +287,25 @@ class OperasionalController extends Controller
                     // Requirement 7 & 11: Hanya alat berkondisi BAIK yang dikembalikan ke stok siap sewa
                     $alat = Alat::where('kode_alat', $detail->kode_alat)->lockForUpdate()->first();
                     if ($alat) {
+                        $stokSebelum = (int) $alat->stok;
                         if ($jumlahBaik > 0) {
                             $alat->stok = $alat->stok + $jumlahBaik;
+                            $alat->save();
+
+                            RiwayatStok::recordChange(
+                                $detail->kode_alat,
+                                'Pengembalian Sewa',
+                                $stokSebelum,
+                                +$jumlahBaik,
+                                $alat->stok,
+                                "Pengembalian pesanan {$trx->no_transaksi} ({$jumlahBaik} Baik".($jumlahRusak > 0 ? ", {$jumlahRusak} Rusak" : '').')',
+                                Auth::id()
+                            );
                         }
                         // Alat rusak TIDAK ditambahkan ke stok siap sewa
                         if ($jumlahRusak > 0) {
                             $adaKerusakan = true;
                         }
-                        $alat->save();
                     }
 
                     if ($jumlahRusak > 0) {

@@ -11,9 +11,13 @@ class Alat extends Model
     use HasFactory;
 
     protected $table = 'alat';
+
     protected $primaryKey = 'kode_alat';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     public $timestamps = false;
 
     /**
@@ -50,6 +54,14 @@ class Alat extends Model
     }
 
     /**
+     * Relasi ke catatan riwayat perubahan stok
+     */
+    public function riwayatStok(): HasMany
+    {
+        return $this->hasMany(RiwayatStok::class, 'kode_alat', 'kode_alat')->orderBy('created_at', 'desc');
+    }
+
+    /**
      * Periksa apakah alat sudah memiliki riwayat transaksi penyewaan
      */
     public function hasRentals(): bool
@@ -71,6 +83,6 @@ class Alat extends Model
      */
     public function getFormattedTarifAttribute(): string
     {
-        return 'Rp ' . number_format((float) $this->tarif_sewa, 0, ',', '.');
+        return 'Rp '.number_format((float) $this->tarif_sewa, 0, ',', '.');
     }
 }

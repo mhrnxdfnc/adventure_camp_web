@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Alat;
 use App\Models\DetailPenyewaan;
+use App\Models\RiwayatStok;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class InventarisController extends Controller
@@ -138,6 +138,9 @@ class InventarisController extends Controller
         $stokSiapSewa = ($alat->kondisi === 'Baik') ? $stokToko : 0;
         $stokRusak = ($alat->kondisi !== 'Baik') ? $stokToko : 0;
 
+        // Ambil riwayat perubahan stok khusus alat ini
+        $riwayatStok = $alat->riwayatStok()->with('user')->take(30)->get();
+
         return view('admin.inventaris.show', [
             'alat' => $alat,
             'stokToko' => $stokToko,
@@ -146,6 +149,45 @@ class InventarisController extends Controller
             'stokSiapSewa' => $stokSiapSewa,
             'stokRusak' => $stokRusak,
             'alokasiAktif' => $alokasiAktif,
+            'riwayatStok' => $riwayatStok,
+        ]);
+    }
+
+    /**
+     * Halaman riwayat perubahan stok global untuk seluruh alat
+     */
+    public function riwayatIndex(Request $request): View
+    {
+        $query = RiwayatStok::with(['alat', 'user']);
+
+        if ($request->filled('q')) {
+            $search = trim($request->q);
+            $query->where(function ($sub) use ($search) {
+                $sub->where('kode_alat', 'like', "%{$search}%")
+                    ->orWhere('alasan', 'like', "%{$search}%")
+                    ->orWhereHas('alat', function ($a) use ($search) {
+                        $a->where('nama_alat', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('kode_alat')) {
+            $query->where('kode_alat', $request->kode_alat);
+        }
+
+        if ($request->filled('jenis')) {
+            $query->where('jenis_perubahan', $request->jenis);
+        }
+
+        $riwayatList = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+        $alatList = Alat::orderBy('nama_alat')->get();
+
+        return view('admin.inventaris.riwayat', [
+            'riwayatList' => $riwayatList,
+            'alatList' => $alatList,
+            'search' => $request->query('q', ''),
+            'selectedAlat' => $request->query('kode_alat', ''),
+            'selectedJenis' => $request->query('jenis', ''),
         ]);
     }
 
@@ -187,28 +229,26 @@ class InventarisController extends Controller
             $alat->stok = $stokSesudah;
             $alat->save();
 
+            $jenisPerubahan = ($tipe === 'tambah') ? 'Penambahan Manual' : 'Pengurangan Manual';
+
             // Catat ke Audit Trail ActivityLog (Waktu dan pengguna tercatat)
-            $actionName = ($tipe === 'tambah') ? 'Penambahan Stok Manual' : 'Pengurangan Stok Manual';
             ActivityLog::record(
                 Auth::id(),
-                $actionName,
+                $jenisPerubahan,
                 'Inventaris',
                 "Kode Alat: {$alat->kode_alat}, Perubahan: ".($delta > 0 ? "+{$delta}" : (string) $delta)." unit, Stok: {$stokSebelum} -> {$stokSesudah}, Alasan: {$alasan}"
             );
 
-            // Jika tabel riwayat_stok sudah ada, catat juga ke log inventaris
-            if (Schema::hasTable('riwayat_stok')) {
-                DB::table('riwayat_stok')->insert([
-                    'kode_alat' => $alat->kode_alat,
-                    'jenis_perubahan' => ($tipe === 'tambah') ? 'Penambahan Manual' : 'Pengurangan Manual',
-                    'stok_sebelum' => $stokSebelum,
-                    'jumlah_perubahan' => $delta,
-                    'stok_sesudah' => $stokSesudah,
-                    'alasan' => $alasan,
-                    'id_user' => Auth::id(),
-                    'created_at' => now(),
-                ]);
-            }
+            // Catat ke Riwayat Perubahan Stok Inventaris
+            RiwayatStok::recordChange(
+                $alat->kode_alat,
+                $jenisPerubahan,
+                $stokSebelum,
+                $delta,
+                $stokSesudah,
+                $alasan,
+                Auth::id()
+            );
 
             return redirect()->route('admin.inventaris.show', $alat->kode_alat)
                 ->with('success', "Stok alat {$alat->nama_alat} ({$alat->kode_alat}) berhasil diperbarui: {$stokSebelum} unit &rarr; {$stokSesudah} unit.");

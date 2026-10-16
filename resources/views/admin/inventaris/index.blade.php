@@ -16,6 +16,12 @@
             <h2 class="h4 font-weight-bold mb-1 text-dark">Pemantauan Inventaris & Ketersediaan Stok</h2>
             <p class="text-muted small mb-0">Pantau ketersediaan stok fisik di store, unit siap sewa, unit yang sedang dialokasikan pelanggan, serta kondisi fisik alat.</p>
         </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ route('admin.inventaris.riwayat') }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                <span>📜</span>
+                <span>Lihat Riwayat Mutasi Stok</span>
+            </a>
+        </div>
     </div>
 </div>
 
