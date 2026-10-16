@@ -12,6 +12,19 @@
 
     <div class="d-flex align-items-center gap-2">
         @auth
+            @if(Auth::user()->isPengguna())
+                <!-- Shopping Cart Navbar Button -->
+                <a href="{{ route('pengguna.keranjang.index') }}" class="btn btn-sm btn-ac-outline position-relative d-inline-flex align-items-center gap-1 me-1" id="navCartBtn" title="Keranjang Belanja">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <span class="d-none d-md-inline">Keranjang</span>
+                    <span class="badge rounded-pill bg-danger" id="cartBadgeCount" style="{{ ($cartCount ?? 0) > 0 ? '' : 'display:none;' }}">
+                        {{ $cartCount ?? 0 }}
+                    </span>
+                </a>
+            @endif
+
             <!-- User Profile Dropdown -->
             <div class="dropdown">
                 <button class="btn btn-sm btn-ac-outline dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">

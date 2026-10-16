@@ -16,33 +16,70 @@ use Illuminate\Support\Facades\DB;
 class PenggunaPesananController extends Controller
 {
     /**
-     * Simpan pengajuan pesanan penyewaan alat camping dari Pengguna
+     * Simpan pengajuan pesanan penyewaan alat camping dari Pengguna (Mendukung multi-item keranjang belanja sekaligus)
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'kode_alat' => ['required', 'string', 'exists:alat,kode_alat'],
-            'jumlah' => ['required', 'integer', 'min:1'],
+        // 1. Validasi header pesanan (tanggal sewa, tanggal kembali, metode pembayaran)
+        $request->validate([
             'tanggal_sewa' => ['required', 'date', 'after_or_equal:today'],
             'tanggal_kembali' => ['required', 'date', 'after:tanggal_sewa'],
             'metode_pembayaran' => ['required', 'in:QRIS,Transfer Bank,Cash'],
+            'kode_alat' => ['nullable', 'string', 'exists:alat,kode_alat'],
+            'jumlah' => ['nullable', 'integer', 'min:1'],
+            'items' => ['nullable', 'array'],
+            'items.*.kode_alat' => ['required_with:items', 'string', 'exists:alat,kode_alat'],
+            'items.*.jumlah' => ['required_with:items', 'integer', 'min:1'],
         ], [
-            'kode_alat.required' => 'Pilihan alat wajib ada.',
-            'kode_alat.exists' => 'Alat camping yang dipilih tidak ditemukan.',
-            'jumlah.required' => 'Jumlah sewa wajib diisi.',
-            'jumlah.integer' => 'Jumlah sewa harus berupa bilangan bulat.',
-            'jumlah.min' => 'Jumlah alat sewa minimal 1 unit.',
             'tanggal_sewa.required' => 'Tanggal mulai sewa wajib diisi.',
             'tanggal_sewa.after_or_equal' => 'Tanggal mulai sewa harus hari ini atau setelahnya.',
             'tanggal_kembali.required' => 'Tanggal pengembalian wajib diisi.',
             'tanggal_kembali.after' => 'Tanggal pengembalian harus sesudah tanggal sewa.',
             'metode_pembayaran.required' => 'Metode pembayaran wajib dipilih.',
             'metode_pembayaran.in' => 'Metode pembayaran harus berupa QRIS, Transfer Bank, atau Cash.',
+            'kode_alat.exists' => 'Alat camping yang dipilih tidak ditemukan.',
+            'jumlah.min' => 'Jumlah alat sewa minimal 1 unit.',
         ]);
 
         $user = Auth::user();
 
-        // Pastikan akun memiliki relasi pelanggan valid
+        // 2. Tentukan daftar item yang akan dipesan (Prioritas: single item langsung, items array, atau isi keranjang session)
+        $orderItems = [];
+
+        if ($request->filled('kode_alat')) {
+            // Pemesanan langsung satuan
+            $orderItems[] = [
+                'kode_alat' => (string) $request->input('kode_alat'),
+                'jumlah' => max(1, (int) $request->input('jumlah', 1)),
+            ];
+        } elseif ($request->filled('items') && is_array($request->input('items'))) {
+            // Pemesanan daftar item eksplisit
+            foreach ($request->input('items') as $rawItem) {
+                if (! empty($rawItem['kode_alat']) && ! empty($rawItem['jumlah'])) {
+                    $orderItems[] = [
+                        'kode_alat' => (string) $rawItem['kode_alat'],
+                        'jumlah' => max(1, (int) $rawItem['jumlah']),
+                    ];
+                }
+            }
+        } else {
+            // Pemesanan dari Keranjang Belanja Pengguna
+            $cart = KeranjangController::getCart($user->id_user);
+            foreach ($cart as $cItem) {
+                $orderItems[] = [
+                    'kode_alat' => $cItem['kode_alat'],
+                    'jumlah' => (int) $cItem['jumlah'],
+                ];
+            }
+        }
+
+        if (empty($orderItems)) {
+            return back()->withErrors([
+                'items' => 'Tidak ada alat camping yang dipilih dalam pesanan. Silakan tambahkan alat ke keranjang belanja.',
+            ])->withInput();
+        }
+
+        // 3. Pastikan akun memiliki profil pelanggan
         $idPelanggan = $user->id_pelanggan;
         if (! $idPelanggan) {
             $pelanggan = Pelanggan::create([
@@ -56,68 +93,98 @@ class PenggunaPesananController extends Controller
             $idPelanggan = $pelanggan->id_pelanggan;
         }
 
+        $tanggalSewa = $request->input('tanggal_sewa');
+        $tanggalKembali = $request->input('tanggal_kembali');
+        $metodePembayaran = $request->input('metode_pembayaran');
+
         try {
-            $noTransaksi = DB::transaction(function () use ($validated, $user, $idPelanggan) {
-                $alat = Alat::where('kode_alat', $validated['kode_alat'])
-                    ->lockForUpdate()
-                    ->firstOrFail();
+            $noTransaksi = DB::transaction(function () use ($orderItems, $tanggalSewa, $tanggalKembali, $metodePembayaran, $user, $idPelanggan) {
+                // Hitung durasi hari dari kedua tanggal
+                $durasi = Penyewaan::hitungDurasiHari($tanggalSewa, $tanggalKembali);
 
-                // Validasi kelayakan kondisi alat (Alat rusak tidak boleh disewa)
-                if ($alat->kondisi !== 'Baik') {
-                    throw new \DomainException("Alat {$alat->nama_alat} saat ini sedang tidak siap disewa (kondisi: {$alat->kondisi}).");
+                $validatedItems = [];
+                $grandTotal = 0.0;
+                $itemLogDescriptions = [];
+
+                // Periksa setiap alat dalam transaksi: kondisi fisik, ketersediaan stok, dan tarif resmi database
+                foreach ($orderItems as $item) {
+                    $alat = Alat::where('kode_alat', $item['kode_alat'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $alat) {
+                        throw new \DomainException("Alat camping dengan kode [{$item['kode_alat']}] tidak ditemukan.");
+                    }
+
+                    // Alat rusak tidak boleh disewa
+                    if ($alat->kondisi !== 'Baik') {
+                        throw new \DomainException("Alat {$alat->nama_alat} saat ini sedang tidak siap disewa (kondisi fisik: {$alat->kondisi}).");
+                    }
+
+                    $jumlah = (int) $item['jumlah'];
+                    if ($jumlah > (int) $alat->stok) {
+                        throw new \DomainException("Stok alat {$alat->nama_alat} tidak mencukupi (tersedia: {$alat->stok} unit, diminta: {$jumlah} unit).");
+                    }
+
+                    $tarifResmi = (float) $alat->tarif_sewa;
+                    $subtotal = Penyewaan::hitungTotalBiaya($tarifResmi, $jumlah, $durasi);
+                    $grandTotal += $subtotal;
+
+                    $validatedItems[] = [
+                        'alat' => $alat,
+                        'kode_alat' => $alat->kode_alat,
+                        'jumlah' => $jumlah,
+                        'tarif_sewa' => $tarifResmi,
+                        'subtotal' => $subtotal,
+                    ];
+
+                    $itemLogDescriptions[] = "{$alat->nama_alat} ({$jumlah} unit)";
                 }
 
-                // Validasi ketersediaan stok fisik
-                $jumlahDiminta = (int) $validated['jumlah'];
-                if ($jumlahDiminta > (int) $alat->stok) {
-                    throw new \DomainException("Stok alat {$alat->nama_alat} tidak mencukupi (tersedia: {$alat->stok} unit, diminta: {$jumlahDiminta} unit).");
-                }
-
-                // Kalkulasi durasi sewa di backend menggunakan satu sumber logika model
-                $durasi = Penyewaan::hitungDurasiHari($validated['tanggal_sewa'], $validated['tanggal_kembali']);
-
-                // Kalkulasi total biaya resmi dari tarif database: tarif × jumlah × durasi
-                $tarifResmi = (float) $alat->tarif_sewa;
-                $totalBiaya = Penyewaan::hitungTotalBiaya($tarifResmi, $jumlahDiminta, $durasi);
-
-                // Buat nomor transaksi unik
+                // Buat 1 nomor transaksi penyewaan
                 $noTrx = Penyewaan::generateNoTransaksi();
 
-                // Simpan transaksi penyewaan (status awal: Menunggu Konfirmasi)
+                // Simpan data transaksi penyewaan utama (header transaksi)
                 Penyewaan::create([
                     'no_transaksi' => $noTrx,
                     'id_pelanggan' => $idPelanggan,
                     'id_user' => $user->id_user,
-                    'tanggal_sewa' => $validated['tanggal_sewa'],
-                    'tanggal_kembali' => $validated['tanggal_kembali'],
+                    'tanggal_sewa' => $tanggalSewa,
+                    'tanggal_kembali' => $tanggalKembali,
                     'status_penyewaan' => 'Menunggu Konfirmasi',
                 ]);
 
-                // Simpan detail alat yang disewa dengan tarif resmi database
-                DetailPenyewaan::create([
-                    'no_transaksi' => $noTrx,
-                    'kode_alat' => $alat->kode_alat,
-                    'jumlah' => $jumlahDiminta,
-                    'tarif_sewa' => $tarifResmi,
-                ]);
+                // Simpan seluruh rincian alat ke dalam detail_penyewaan
+                foreach ($validatedItems as $vItem) {
+                    DetailPenyewaan::create([
+                        'no_transaksi' => $noTrx,
+                        'kode_alat' => $vItem['kode_alat'],
+                        'jumlah' => $vItem['jumlah'],
+                        'tarif_sewa' => $vItem['tarif_sewa'],
+                    ]);
+                }
 
-                // Buat data pembayaran awal (status awal: Belum Dibayar)
+                // Buat 1 data pembayaran dengan total penjumlahan seluruh alat
                 $noPembayaran = Pembayaran::generateNoPembayaran();
                 Pembayaran::create([
                     'no_pembayaran' => $noPembayaran,
                     'no_transaksi' => $noTrx,
-                    'total_biaya' => $totalBiaya,
+                    'total_biaya' => $grandTotal,
                     'jumlah_pembayaran' => 0,
-                    'metode_pembayaran' => $validated['metode_pembayaran'],
+                    'metode_pembayaran' => $metodePembayaran,
                     'status_pembayaran' => 'Belum Dibayar',
                 ]);
 
+                // Kosongkan keranjang belanja pengguna setelah checkout sukses
+                KeranjangController::clear($user->id_user);
+
                 // Catat ke audit trail
+                $summaryItems = implode(', ', $itemLogDescriptions);
                 ActivityLog::record(
                     $user->id_user,
                     'Mengajukan Pesanan Penyewaan',
                     'Penyewaan',
-                    "No Transaksi: {$noTrx}, Alat: {$alat->nama_alat} ({$jumlahDiminta} unit), Durasi: {$durasi} hari, Estimasi: Rp ".number_format($totalBiaya, 0, ',', '.').", Metode: {$validated['metode_pembayaran']}"
+                    "No Transaksi: {$noTrx}, Rincian: {$summaryItems}, Durasi: {$durasi} hari, Total Tagihan: Rp ".number_format($grandTotal, 0, ',', '.').", Metode: {$metodePembayaran}"
                 );
 
                 return $noTrx;

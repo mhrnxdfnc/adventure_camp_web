@@ -7,6 +7,7 @@ use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventarisController;
 use App\Http\Controllers\KatalogController;
+use App\Http\Controllers\KeranjangController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PembelianInventarisController;
@@ -102,7 +103,18 @@ Route::middleware(['auth', 'role:Pengguna'])
         Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
         Route::get('/katalog/{kode_alat}', [KatalogController::class, 'show'])->name('katalog.show');
 
-        // Pengajuan Pesanan Penyewaan Alat Camping
+        // Keranjang Belanja Pengguna (Multi-item)
+        Route::get('/keranjang', [KeranjangController::class, 'index'])->name('keranjang.index');
+        Route::post('/keranjang/tambah', [KeranjangController::class, 'tambah'])->name('keranjang.tambah');
+        Route::post('/keranjang/update', [KeranjangController::class, 'update'])->name('keranjang.update');
+        Route::post('/keranjang/hapus', [KeranjangController::class, 'hapus'])->name('keranjang.hapus');
+        Route::post('/keranjang/kosongkan', [KeranjangController::class, 'kosongkan'])->name('keranjang.kosongkan');
+
+        // Checkout Sekaligus Seluruh Alat
+        Route::get('/checkout', [KeranjangController::class, 'checkout'])->name('checkout.index');
+        Route::post('/checkout', [PenggunaPesananController::class, 'store'])->name('checkout.store');
+
+        // Pengajuan Pesanan Penyewaan Alat Camping (Mendukung pemesanan single & multi-item)
         Route::post('/pesanan', [PenggunaPesananController::class, 'store'])->name('pesanan.store');
 
         // Halaman Instruksi Pembayaran Pesanan Disetujui

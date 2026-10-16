@@ -90,6 +90,37 @@
                         </div>
                     </div>
 
+                    <!-- Aksi Tambah ke Keranjang Belanja -->
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <label class="form-label font-weight-bold small d-flex justify-content-between mb-2">
+                            <span>Tambah ke Keranjang Belanja</span>
+                            <span class="text-muted fw-normal">Maks. {{ $alat->stok }} unit</span>
+                        </label>
+                        <form action="{{ route('pengguna.keranjang.tambah') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="kode_alat" value="{{ $alat->kode_alat }}">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="input-group" style="max-width: 130px;">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="stepCartQty(-1, {{ $alat->stok }})">-</button>
+                                    <input type="number" name="jumlah" id="inputCartJumlah" class="form-control text-center font-weight-bold" value="1" min="1" max="{{ $alat->stok }}" required>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="stepCartQty(1, {{ $alat->stok }})">+</button>
+                                </div>
+                                <button type="submit" class="btn btn-ac-primary flex-grow-1 font-weight-bold d-flex align-items-center justify-content-center gap-1">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                    <span>+ Tambah ke Keranjang</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="d-flex align-items-center my-3 text-muted">
+                        <hr class="flex-grow-1">
+                        <span class="px-2 small text-uppercase" style="font-size:0.7rem; letter-spacing:0.05em;">Atau Pesan Langsung Satuan</span>
+                        <hr class="flex-grow-1">
+                    </div>
+
                     <form action="{{ route('pengguna.pesanan.store') }}" method="POST" id="formPemesananAlat">
                         @csrf
                         <input type="hidden" name="kode_alat" value="{{ $alat->kode_alat }}">
@@ -217,6 +248,14 @@
                             document.getElementById('labelDurasi').textContent = durasi + ' Hari';
                             document.getElementById('labelKalkulasi').textContent = jumlah + ' × Rp ' + tarifPerHari.toLocaleString('id-ID') + ' × ' + durasi + ' hari';
                             document.getElementById('labelTotal').textContent = 'Rp ' + total.toLocaleString('id-ID');
+                        }
+
+                        function stepCartQty(delta, max) {
+                            const input = document.getElementById('inputCartJumlah');
+                            if (!input) return;
+                            let val = parseInt(input.value) || 1;
+                            val = Math.max(1, Math.min(max, val + delta));
+                            input.value = val;
                         }
                     </script>
                 @else
