@@ -57,6 +57,11 @@ Route::middleware(['auth', 'role:Admin'])
         // Operasional Penyerahan Alat (Pengambilan)
         Route::get('/pengambilan', [OperasionalController::class, 'pengambilanIndex'])->name('operasional.pengambilan');
         Route::post('/pengambilan/{no_transaksi}', [OperasionalController::class, 'prosesPengambilan'])->name('operasional.proses-pengambilan');
+
+        // Operasional Pengembalian Alat & Perhitungan Denda
+        Route::get('/pengembalian', [OperasionalController::class, 'pengembalianIndex'])->name('operasional.pengembalian');
+        Route::get('/pengembalian/{no_transaksi}', [OperasionalController::class, 'formPengembalian'])->name('operasional.form-pengembalian');
+        Route::post('/pengembalian/{no_transaksi}', [OperasionalController::class, 'prosesPengembalian'])->name('operasional.proses-pengembalian');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)

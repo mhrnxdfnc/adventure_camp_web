@@ -143,13 +143,32 @@
             </div>
         @endauth
 
-        <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pengembalian selesai">
-            <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-            </svg>
-            <span>Pengembalian & Denda</span>
-            <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
-        </div>
+        @auth
+            @if(Auth::user()->isAdmin())
+                <a href="{{ route('admin.operasional.pengembalian') }}" class="ac-menu-item {{ request()->is('admin/pengembalian*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                    </svg>
+                    <span>Pengembalian & Denda</span>
+                </a>
+            @else
+                <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pengembalian selesai">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                    </svg>
+                    <span>Pengembalian & Denda</span>
+                    <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+                </div>
+            @endif
+        @else
+            <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pengembalian selesai">
+                <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                </svg>
+                <span>Pengembalian & Denda</span>
+                <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+            </div>
+        @endauth
 
         <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul inventaris selesai">
             <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
