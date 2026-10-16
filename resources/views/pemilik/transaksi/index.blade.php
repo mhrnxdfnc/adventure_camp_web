@@ -14,6 +14,59 @@
     </div>
 </div>
 
+<!-- Search and Date Filter Form -->
+<div class="ac-card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+    <div class="ac-card-body p-4">
+        <form method="GET" action="{{ route('pemilik.transaksi.index') }}" class="row g-3">
+            <div class="col-12 col-md-4">
+                <label for="search" class="form-label small fw-bold text-muted">Kata Kunci Pencarian</label>
+                <input type="text" name="search" id="search" class="form-control form-control-sm" placeholder="No. Transaksi atau Nama Pelanggan..." value="{{ $filters['search'] ?? '' }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="tanggal_mulai" class="form-label small fw-bold text-muted">Tanggal Mulai</label>
+                <input type="date" name="tanggal_mulai" id="tanggal_mulai" class="form-control form-control-sm" value="{{ $filters['tanggal_mulai'] ?? '' }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="tanggal_selesai" class="form-label small fw-bold text-muted">Tanggal Selesai</label>
+                <input type="date" name="tanggal_selesai" id="tanggal_selesai" class="form-control form-control-sm" value="{{ $filters['tanggal_selesai'] ?? '' }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="status_penyewaan" class="form-label small fw-bold text-muted">Status Pesanan</label>
+                <select name="status_penyewaan" id="status_penyewaan" class="form-select form-select-sm">
+                    <option value="">Semua Status</option>
+                    <option value="Menunggu Pembayaran" {{ ($filters['status_penyewaan'] ?? '') === 'Menunggu Pembayaran' ? 'selected' : '' }}>Menunggu Pembayaran</option>
+                    <option value="Menunggu Konfirmasi" {{ ($filters['status_penyewaan'] ?? '') === 'Menunggu Konfirmasi' ? 'selected' : '' }}>Menunggu Konfirmasi</option>
+                    <option value="Disetujui" {{ ($filters['status_penyewaan'] ?? '') === 'Disetujui' ? 'selected' : '' }}>Disetujui</option>
+                    <option value="Siap Diambil" {{ ($filters['status_penyewaan'] ?? '') === 'Siap Diambil' ? 'selected' : '' }}>Siap Diambil</option>
+                    <option value="Berjalan" {{ ($filters['status_penyewaan'] ?? '') === 'Berjalan' ? 'selected' : '' }}>Sedang Disewa / Berjalan</option>
+                    <option value="Selesai" {{ ($filters['status_penyewaan'] ?? '') === 'Selesai' ? 'selected' : '' }}>Selesai</option>
+                    <option value="Dibatalkan" {{ ($filters['status_penyewaan'] ?? '') === 'Dibatalkan' ? 'selected' : '' }}>Dibatalkan</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="status_pembayaran" class="form-label small fw-bold text-muted">Status Pembayaran</label>
+                <select name="status_pembayaran" id="status_pembayaran" class="form-select form-select-sm">
+                    <option value="">Semua Pembayaran</option>
+                    <option value="Lunas" {{ ($filters['status_pembayaran'] ?? '') === 'Lunas' ? 'selected' : '' }}>Lunas</option>
+                    <option value="Menunggu Verifikasi" {{ ($filters['status_pembayaran'] ?? '') === 'Menunggu Verifikasi' ? 'selected' : '' }}>Menunggu Verifikasi</option>
+                    <option value="Belum Dibayar" {{ ($filters['status_pembayaran'] ?? '') === 'Belum Dibayar' ? 'selected' : '' }}>Belum Dibayar</option>
+                    <option value="Ditolak" {{ ($filters['status_pembayaran'] ?? '') === 'Ditolak' ? 'selected' : '' }}>Ditolak</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+                @if($hasActiveFilter)
+                    <a href="{{ route('pemilik.transaksi.index') }}" class="btn btn-sm btn-outline-secondary">
+                        ✕ Reset Filter
+                    </a>
+                @endif
+                <button type="submit" class="btn btn-sm btn-primary">
+                    🔍 Terapkan Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="ac-card shadow-sm border-0 mb-4" style="border-radius: 12px;">
     <div class="ac-card-header d-flex flex-wrap justify-content-between align-items-center bg-white border-bottom py-3 px-4 gap-2">
         <div>
@@ -75,9 +128,18 @@
                     @empty
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
-                                <div class="mb-2" style="font-size: 2.5rem;">📭</div>
-                                <h6 class="fw-bold text-secondary">Belum Ada Riwayat Transaksi Pelanggan</h6>
-                                <p class="small text-muted mb-0">Seluruh riwayat pemesanan yang tercatat di database akan ditampilkan di sini.</p>
+                                @if($hasActiveFilter)
+                                    <div class="mb-2" style="font-size: 2.5rem;">🔍</div>
+                                    <h6 class="fw-bold text-secondary">Tidak Ada Transaksi Sesuai Filter</h6>
+                                    <p class="small text-muted mb-3">Tidak ditemukan data transaksi pemesanan yang cocok dengan kriteria pencarian dan tanggal yang dipilih.</p>
+                                    <a href="{{ route('pemilik.transaksi.index') }}" class="btn btn-sm btn-outline-secondary">
+                                        Reset Filter
+                                    </a>
+                                @else
+                                    <div class="mb-2" style="font-size: 2.5rem;">📭</div>
+                                    <h6 class="fw-bold text-secondary">Belum Ada Riwayat Transaksi Pelanggan</h6>
+                                    <p class="small text-muted mb-0">Seluruh riwayat pemesanan yang tercatat di database akan ditampilkan di sini.</p>
+                                @endif
                             </td>
                         </tr>
                     @endforelse

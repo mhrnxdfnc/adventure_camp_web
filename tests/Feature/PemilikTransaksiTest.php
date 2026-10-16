@@ -218,4 +218,139 @@ class PemilikTransaksiTest extends TestCase
         $response->assertSee('TRX-20261015-002');
         $response->assertSee('Catatan Data Historis Legacy');
     }
+
+    /**
+     * Uji pencarian transaksi berdasarkan nomor transaksi dan nama pelanggan.
+     */
+    public function test_pemilik_can_search_transactions_by_number_and_customer_name(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        // Pelanggan 1: Andi Pratama
+        // Pelanggan 2: Budi Santoso
+        $sewa1 = Penyewaan::create([
+            'no_transaksi' => 'TRX-SEARCH-ANDI',
+            'id_pelanggan' => 1,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-15',
+            'tanggal_kembali' => '2026-10-17',
+            'status_penyewaan' => 'Disetujui',
+        ]);
+
+        $sewa2 = Penyewaan::create([
+            'no_transaksi' => 'TRX-SEARCH-BUDI',
+            'id_pelanggan' => 2,
+            'id_user' => 4,
+            'tanggal_sewa' => '2026-10-15',
+            'tanggal_kembali' => '2026-10-17',
+            'status_penyewaan' => 'Disetujui',
+        ]);
+
+        // Cari berdasarkan nama "Andi"
+        $responseAndi = $this->actingAs($pemilik)->get(route('pemilik.transaksi.index', ['search' => 'Andi']));
+        $responseAndi->assertStatus(200);
+        $responseAndi->assertSee('TRX-SEARCH-ANDI');
+        $responseAndi->assertDontSee('TRX-SEARCH-BUDI');
+
+        // Cari berdasarkan nomor transaksi "SEARCH-BUDI"
+        $responseBudi = $this->actingAs($pemilik)->get(route('pemilik.transaksi.index', ['search' => 'SEARCH-BUDI']));
+        $responseBudi->assertStatus(200);
+        $responseBudi->assertSee('TRX-SEARCH-BUDI');
+        $responseBudi->assertDontSee('TRX-SEARCH-ANDI');
+    }
+
+    /**
+     * Uji filter transaksi berdasarkan rentang tanggal pemesanan.
+     */
+    public function test_pemilik_can_filter_transactions_by_date_range(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $sewaAwalBulan = Penyewaan::create([
+            'no_transaksi' => 'TRX-DATE-001',
+            'id_pelanggan' => 1,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-01',
+            'tanggal_kembali' => '2026-10-03',
+            'status_penyewaan' => 'Selesai',
+        ]);
+
+        $sewaAkhirBulan = Penyewaan::create([
+            'no_transaksi' => 'TRX-DATE-002',
+            'id_pelanggan' => 1,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-25',
+            'tanggal_kembali' => '2026-10-27',
+            'status_penyewaan' => 'Menunggu Pembayaran',
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.transaksi.index', [
+            'tanggal_mulai' => '2026-10-20',
+            'tanggal_selesai' => '2026-10-31',
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('TRX-DATE-002');
+        $response->assertDontSee('TRX-DATE-001');
+    }
+
+    /**
+     * Uji filter transaksi berdasarkan status pesanan dan status pembayaran.
+     */
+    public function test_pemilik_can_filter_transactions_by_status(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $sewaLunas = Penyewaan::create([
+            'no_transaksi' => 'TRX-STAT-LUNAS',
+            'id_pelanggan' => 1,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-15',
+            'tanggal_kembali' => '2026-10-17',
+            'status_penyewaan' => 'Disetujui',
+        ]);
+        Pembayaran::create([
+            'no_pembayaran' => 'PAY-STAT-LUNAS',
+            'no_transaksi' => 'TRX-STAT-LUNAS',
+            'total_biaya' => 100000,
+            'jumlah_pembayaran' => 100000,
+            'metode_pembayaran' => 'Cash',
+            'tanggal_pembayaran' => now(),
+            'status_pembayaran' => 'Lunas',
+        ]);
+
+        $sewaPending = Penyewaan::create([
+            'no_transaksi' => 'TRX-STAT-PENDING',
+            'id_pelanggan' => 1,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-15',
+            'tanggal_kembali' => '2026-10-17',
+            'status_penyewaan' => 'Menunggu Pembayaran',
+        ]);
+
+        // Filter status pembayaran Lunas
+        $response = $this->actingAs($pemilik)->get(route('pemilik.transaksi.index', [
+            'status_pembayaran' => 'Lunas',
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('TRX-STAT-LUNAS');
+        $response->assertDontSee('TRX-STAT-PENDING');
+    }
+
+    /**
+     * Uji kondisi kosong ketika hasil filter tidak menemukan transaksi yang cocok.
+     */
+    public function test_pemilik_filter_renders_informative_empty_state_when_no_match(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.transaksi.index', [
+            'search' => 'NOMOR_TIDAK_MUNGKIN_ADA_9999999',
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Tidak Ada Transaksi Sesuai Filter');
+        $response->assertSee('Reset Filter');
+    }
 }
