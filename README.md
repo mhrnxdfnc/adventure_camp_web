@@ -1,58 +1,194 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Adventure Camp Rental Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem Informasi Manajemen Penyewaan Alat Camping dan Perlengkapan Outdoor berbasis web menggunakan Laravel 12 dan PHP 8.3+. Dirancang untuk mengelola seluruh siklus operasional rental mulai dari reservasi pelanggan, persetujuan admin, verifikasi pembayaran, serah terima alat (pickup), pengembalian & kalkulasi denda, pemantauan inventaris fisik, hingga dashboard pengawasan bisnis bagi pemilik usaha.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 1. Persyaratan Sistem
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Pastikan lingkungan server lokal Anda memenuhi spesifikasi berikut:
+- **PHP**: Versi 8.2 atau lebih baru (direkomendasikan PHP 8.3 / PHP 8.4)
+- **Ekstensi PHP Wajib**: `pdo_mysql`, `mbstring`, `openssl`, `xml`, `ctype`, `json`, `tokenizer`, `curl`, `fileinfo`
+- **Database**: MySQL 5.7+ / MariaDB 10.3+ (Tersedia langsung di Laragon)
+- **Composer**: Versi 2.x
+- **Web Server**: Apache / Nginx (via Laragon) atau PHP Built-in Server
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 2. Panduan Instalasi & Konfigurasi
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+### Langkah 1: Clone atau Buka Proyek
+Letakkan direktori proyek di dalam folder root web Laragon:
+```text
+C:\laragon\www\adventure_camp_web
+```
+atau pada drive lain yang terhubung dengan Laragon:
+```text
+D:\APP\laragon\www\adventure_camp_web
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Langkah 2: Instal Dependensi Composer
+Buka terminal (Laragon Terminal atau PowerShell) di direktori proyek, lalu jalankan:
+```bash
+composer install
+```
 
-## Contributing
+### Langkah 3: Konfigurasi Berkas Lingkungan (.env)
+Salin berkas template lingkungan `.env.example` menjadi `.env`:
+```bash
+cp .env.example .env
+```
+Buka berkas `.env` dan sesuaikan parameter koneksi database MySQL:
+```dotenv
+APP_NAME="Adventure Camp Rental"
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_TIMEZONE=Asia/Jakarta
+APP_URL=http://localhost:8000
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=adventure_camp_rental
+DB_USERNAME=root
+DB_PASSWORD=root
+```
+> **Catatan Laragon**: Password default MySQL pada instalasi Laragon standar umumnya kosong (`DB_PASSWORD=`) atau disesuaikan dengan konfigurasi root MySQL Anda.
 
-## Code of Conduct
+### Langkah 4: Generate Application Key
+```bash
+php artisan key:generate
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Langkah 5: Migrasi Database & Seeder
+Buat database bernama `adventure_camp_rental` di phpMyAdmin / HeidiSQL Laragon, lalu jalankan migrasi dan seeder awal:
+```bash
+php artisan migrate --seed
+```
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## 3. Cara Menjalankan Aplikasi Melalui Laragon
 
-## License
+### Opsi A: Menggunakan Laragon Auto Virtual Host
+1. Pastikan servis **Apache** dan **MySQL** pada Laragon berstatus **Running** (Klik tombol *Start All* pada Laragon).
+2. Jika diletakkan di `C:\laragon\www\adventure_camp_web`, Laragon akan otomatis membuat virtual host:
+   ```text
+   http://adventure_camp_web.test
+   ```
+3. Buka URL tersebut di peramban (browser) Anda.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Opsi B: Menggunakan PHP Artisan Serve
+Jalankan dev server bawaan Laravel:
+```bash
+php artisan serve
+```
+Akses aplikasi melalui peramban pada alamat:
+```text
+http://127.0.0.1:8000
+```
+
+---
+
+## 4. Cara Menjalankan Pengujian Otomatis (Testing)
+
+Proyek ini dilengkapi dengan rangkaian pengujian fitur dan integrasi end-to-end menyeluruh (Feature & Unit Tests):
+
+1. **Menjalankan Seluruh Test Suite**:
+   ```bash
+   php artisan test
+   ```
+   *(Menjalankan 164 pengujian dengan SQLite in-memory yang terisolasi dari database produksi/lokal)*.
+
+2. **Menjalankan Pengujian Integrasi End-to-End Spesifik**:
+   ```bash
+   php artisan test --filter=AdventureCampIntegrationTest
+   ```
+
+3. **Menjalankan Pengujian Berdasarkan Modul**:
+   ```bash
+   php artisan test --filter=OperasionalTest
+   php artisan test --filter=PembayaranTest
+   php artisan test --filter=InventarisTest
+   php artisan test --filter=PemilikDashboardTest
+   php artisan test --filter=AdminLogViewTest
+   ```
+
+---
+
+## 5. Dokumentasi Hak Akses & Tiga Role Pengguna
+
+Aplikasi menerapkan pembatasan hak akses berbasis peran (*Role-Based Access Control*) yang ketat:
+
+| Role | Username Bawaan | Password Bawaan | Deskripsi Hak Akses |
+|---|---|---|---|
+| **Admin** | `admin` | `password` / `admin123` | **Operasional Penuh**: Menyetujui/menolak pesanan sewa, verifikasi pembayaran manual, penyerahan barang, pengembalian & perhitungan denda, kelola master data alat, penyesuaian stok inventaris fisik, dan memeriksa audit trail log. |
+| **Pengguna** | `pelanggan` | `password` / `pelanggan123` | **Layanan Mandiri Pelanggan**: Eksplorasi katalog alat outdoor siap sewa, pengajuan sewa mandiri, melihat instruksi bayar (QRIS/Transfer/Cash), unggah bukti transfer, memantau status pesanan, dan melihat riwayat denda/pengembalian sendiri. |
+| **Pemilik** | `pemilik` | `password` / `pemilik123` | **Strictly Read-Only (Pengawasan Bisnis)**: Memantau ringkasan omzet penjualan hari ini dan bulan berjalan, grafik tren harian/bulanan, rincian riwayat transaksi pelanggan, serta audit alat rusak atau butuh perbaikan. Tidak memiliki tombol operasional atau aksi mutasi data. |
+
+---
+
+## 6. Alur Bisnis & Transaksi Penyewaan
+
+```text
+[Pelanggan]
+  Katalog Alat -> Pilih Alat, Jumlah & Periode -> Kirim Pesanan
+       |
+       v (Status: Menunggu Konfirmasi)
+[Admin]
+  Periksa Ketersediaan Stok Real-Time -> Setujui / Tolak Pesanan
+       | (Jika Disetujui -> Status: Menunggu Pembayaran)
+       v
+[Pelanggan]
+  Pilih Metode Bayar:
+  * Transfer Bank -> Unggah Berkas Bukti Transfer (JPG/PNG/PDF maks 2MB)
+  * QRIS Kasir -> Minta Kode QRIS Kasir saat berkunjung
+  * Cash / Tunai -> Pembayaran Langsung di Kasir
+       |
+       v (Status Pembayaran: Menunggu Verifikasi)
+[Admin]
+  Verifikasi Bukti / Terima Dana -> Konfirmasi Pembayaran (Status: Lunas)
+       |
+       v (Status Pesanan: Siap Diambil)
+[Admin - Penyerahan Alat]
+  Catat Tanggal Ambil & Nama Penerima -> Serah Terima Alat
+       | (Status Pesanan: Sedang Disewa, Stok Fisik Berkurang)
+       v
+[Admin - Pengembalian Alat]
+  Catat Tanggal Kembali Aktual -> Audit Kondisi Fisik Alat (Layak Sewa vs Rusak)
+  -> Kalkulasi Denda Terlambat/Kerusakan -> Selesaikan Transaksi
+       | (Status Pesanan: Selesai, Stok Layak Sewa Kembali)
+       v
+[Audit Log & Rekap Laporan Pemilik]
+```
+
+---
+
+## 7. Pengelolaan Inventaris & Stok Fisik
+
+1. **Pemisahan Kondisi Alat**:
+   - **Layak Sewa (`Baik`)**: Alat dalam kondisi prima yang diperhitungkan ke dalam stok siap sewa.
+   - **Perlu Perbaikan**: Alat membutuhkan pemeliharaan ringan sebelum dapat disewakan kembali.
+   - **Rusak**: Alat rusak yang dikeluarkan dari perhitungan stok siap sewa untuk mencegah kegagalan pemenuhan pesanan pelanggan.
+2. **Riwayat Perubahan Stok (*Stock Movement History*)**:
+   - Setiap mutasi stok (penambahan stok baru, pengurangan stok serah terima, pengembalian, penyesuaian audit opname) tercatat secara otomatis di tabel `riwayat_stok` lengkap dengan identitas admin dan alasan perubahan.
+3. **Pencegahan Stok Negatif & Transaksi Ganda**:
+   - Sistem menggunakan transaksi basis data dengan mekanisme *pessimistic locking* (`lockForUpdate`) untuk mencegah kondisi balapan (*race condition*) ketika dua pesanan bersaing atas stok unit yang terbatas.
+
+---
+
+## 8. Batasan Sistem & Keterbatasan Implementasi Saat Ini
+
+Sesuai kesepakatan dan batasan modul saat ini:
+1. **Verifikasi Pembayaran Manual**:
+   - Integrasi payment gateway otomatis (misalnya Midtrans/Xendit/Doku) belum diimplementasikan. Pembayaran QRIS kasir dan transfer bank diverifikasi secara manual oleh Admin/Kasir setelah mengecek mutasi rekening atau struk pembayaran kasir.
+2. **Pembayaran Penuh (Full Payment)**:
+   - Sistem saat ini mensyaratkan pembayaran lunas penuh sebelum barang diserahterimakan. Pembayaran sebagian (*partial payment*) atau skema uang muka (*down payment / DP*) belum didukung.
+3. **Data Historis Legacy**:
+   - Transaksi legasi masa lalu yang tidak memiliki rincian item alat di tabel `detail_penyewaan` tetap ditampilkan secara utuh dan aman pada riwayat pesanan dengan label khusus data historis tanpa merusak integritas pelaporan keuangan.
+
+---
+
+## 9. Lisensi & Hak Cipta
+Hak Cipta &copy; 2026 Adventure Camp Rental. Dikembangkan untuk manajemen penyewaan alat outdoor yang andal, aman, dan efisien.
