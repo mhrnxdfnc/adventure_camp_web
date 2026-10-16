@@ -97,9 +97,12 @@
                     </div>
                 </div>
 
-                <!-- Info pembayaran sesuai SOP: tidak ada QR acak dan tidak ada tombol bayar pura-pura -->
-                <div class="alert alert-info py-2 px-3 mb-0 small" style="border-radius:8px;">
-                    <strong>Petunjuk Pembayaran:</strong> Instruksi bayar resmi (QRIS kasir / transfer rekening bank) akan ditampilkan di halaman ini setelah modul pembayaran diaktifkan.
+                <!-- Akses instruksi pembayaran sesuai SOP -->
+                <div class="mt-3">
+                    <a href="{{ route('pengguna.pembayaran.qris', 'TRX-20261015-001') }}" class="btn btn-success w-100 font-weight-bold d-flex align-items-center justify-content-center gap-2" id="btn-lihat-instruksi-bayar">
+                        <span>💳</span>
+                        <span>Lihat Instruksi Pembayaran &rarr;</span>
+                    </a>
                 </div>
             </div>
         </div>

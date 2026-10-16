@@ -1,10 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\KatalogController;
+use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\UiController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,7 +57,18 @@ Route::middleware(['auth', 'role:Pengguna'])
         // Katalog Alat Camping Siap Sewa
         Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
         Route::get('/katalog/{kode_alat}', [KatalogController::class, 'show'])->name('katalog.show');
+
+        // Halaman Instruksi Pembayaran Pesanan Disetujui
+        Route::get('/pembayaran/{no_transaksi}/qris', [PembayaranController::class, 'showQris'])->name('pembayaran.qris');
+        Route::get('/pembayaran/{no_transaksi}/transfer', [PembayaranController::class, 'showTransfer'])->name('pembayaran.transfer');
+        Route::get('/pembayaran/{no_transaksi}/cash', [PembayaranController::class, 'showCash'])->name('pembayaran.cash');
+        Route::post('/pembayaran/{no_transaksi}/upload-bukti', [PembayaranController::class, 'uploadBukti'])->name('pembayaran.upload-bukti');
     });
+
+// Akses Berkas Bukti Pembayaran Terproteksi (Hanya Admin atau Pengguna Pemilik Transaksi)
+Route::middleware('auth')
+    ->get('/pembayaran/{no_transaksi}/bukti', [PembayaranController::class, 'lihatBukti'])
+    ->name('pembayaran.bukti');
 
 // Rute Dashboard Pemilik (Strictly Read-Only)
 Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])

@@ -11,18 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('penyewaan')) {
+        if (! Schema::hasTable('penyewaan')) {
             Schema::create('penyewaan', function (Blueprint $table) {
                 $table->string('no_transaksi', 20)->primary();
                 $table->unsignedInteger('id_pelanggan');
                 $table->unsignedBigInteger('id_user');
                 $table->date('tanggal_sewa');
                 $table->date('tanggal_kembali');
-                $table->enum('status_penyewaan', ['Berjalan', 'Selesai', 'Dibatalkan'])->default('Berjalan');
+                $table->string('status_penyewaan', 50)->default('Menunggu Konfirmasi');
             });
         }
 
-        if (!Schema::hasTable('detail_penyewaan')) {
+        if (! Schema::hasTable('detail_penyewaan')) {
             Schema::create('detail_penyewaan', function (Blueprint $table) {
                 $table->increments('id_detail');
                 $table->string('no_transaksi', 20);
@@ -34,7 +34,7 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('activity_logs')) {
+        if (! Schema::hasTable('activity_logs')) {
             Schema::create('activity_logs', function (Blueprint $table) {
                 $table->increments('id_log');
                 $table->unsignedBigInteger('id_user');
