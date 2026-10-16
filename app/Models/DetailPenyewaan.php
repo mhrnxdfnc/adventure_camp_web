@@ -21,6 +21,9 @@ class DetailPenyewaan extends Model
         'kode_alat',
         'jumlah',
         'tarif_sewa',
+        'jumlah_diserahkan',
+        'jumlah_kembali_baik',
+        'jumlah_rusak',
     ];
 
     protected function casts(): array
@@ -28,6 +31,9 @@ class DetailPenyewaan extends Model
         return [
             'jumlah' => 'integer',
             'tarif_sewa' => 'decimal:2',
+            'jumlah_diserahkan' => 'integer',
+            'jumlah_kembali_baik' => 'integer',
+            'jumlah_rusak' => 'integer',
         ];
     }
 

@@ -127,6 +127,30 @@ class Penyewaan extends Model
     }
 
     /**
+     * Relasi ke data pengambilan / serah terima alat
+     */
+    public function pengambilan(): HasOne
+    {
+        return $this->hasOne(Pengambilan::class, 'no_transaksi', 'no_transaksi');
+    }
+
+    /**
+     * Relasi ke data pengembalian alat
+     */
+    public function pengembalian(): HasOne
+    {
+        return $this->hasOne(Pengembalian::class, 'no_transaksi', 'no_transaksi');
+    }
+
+    /**
+     * Relasi ke denda melalui pengembalian
+     */
+    public function getDendaAttribute(): ?Denda
+    {
+        return $this->pengembalian?->denda;
+    }
+
+    /**
      * Validasi status pesanan: hanya pesanan yang telah disetujui Admin yang dapat melihat instruksi pembayaran
      */
     public function isSiapDibayar(): bool
@@ -140,8 +164,36 @@ class Penyewaan extends Model
             'Berjalan',
             'Siap Diambil',
             'Sedang Disewa',
+            'Selesai',
         ];
 
         return in_array($status, $allowedStatuses, true);
+    }
+
+    /**
+     * Periksa apakah pesanan memenuhi kriteria siap diambil (Disetujui & Pembayaran Lunas)
+     */
+    public function isSiapDiambil(): bool
+    {
+        $statusValid = in_array($this->status_penyewaan, ['Siap Diambil', 'Disetujui'], true);
+        $pembayaranLunas = $this->pembayaran && $this->pembayaran->isLunas();
+
+        return $statusValid && $pembayaranLunas;
+    }
+
+    /**
+     * Periksa apakah pesanan sedang aktif disewa di lapangan
+     */
+    public function isSedangDisewa(): bool
+    {
+        return in_array($this->status_penyewaan, ['Sedang Disewa', 'Berjalan'], true);
+    }
+
+    /**
+     * Periksa apakah pesanan telah selesai dikembalikan
+     */
+    public function isSelesai(): bool
+    {
+        return $this->status_penyewaan === 'Selesai';
     }
 }

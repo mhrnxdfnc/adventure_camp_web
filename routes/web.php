@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminPembayaranController;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\KatalogController;
+use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +53,10 @@ Route::middleware(['auth', 'role:Admin'])
         Route::get('/pembayaran/{no_transaksi}', [AdminPembayaranController::class, 'show'])->name('pembayaran.show');
         Route::post('/pembayaran/{no_transaksi}/konfirmasi', [AdminPembayaranController::class, 'konfirmasi'])->name('pembayaran.konfirmasi');
         Route::post('/pembayaran/{no_transaksi}/tolak', [AdminPembayaranController::class, 'tolak'])->name('pembayaran.tolak');
+
+        // Operasional Penyerahan Alat (Pengambilan)
+        Route::get('/pengambilan', [OperasionalController::class, 'pengambilanIndex'])->name('operasional.pengambilan');
+        Route::post('/pengambilan/{no_transaksi}', [OperasionalController::class, 'prosesPengambilan'])->name('operasional.proses-pengambilan');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)

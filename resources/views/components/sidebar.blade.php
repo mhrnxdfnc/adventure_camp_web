@@ -89,13 +89,32 @@
             </a>
         @endauth
 
-        <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul transaksi selesai">
-            <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-            </svg>
-            <span>Penyewaan</span>
-            <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
-        </div>
+        @auth
+            @if(Auth::user()->isAdmin())
+                <a href="{{ route('admin.operasional.pengambilan') }}" class="ac-menu-item {{ request()->is('admin/pengambilan*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span>Penyerahan Alat</span>
+                </a>
+            @else
+                <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul transaksi selesai">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span>Penyewaan</span>
+                    <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+                </div>
+            @endif
+        @else
+            <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul transaksi selesai">
+                <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <span>Penyewaan</span>
+                <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+            </div>
+        @endauth
 
         @auth
             @if(Auth::user()->isAdmin())
