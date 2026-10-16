@@ -235,6 +235,61 @@
     </div>
 </div>
 
+<!-- 2 Visual Sales Charts -->
+<div class="row g-4 mb-4">
+    <!-- Grafik Penjualan Harian -->
+    <div class="col-12 col-lg-6">
+        <div class="ac-card h-100 shadow-sm border-0" style="border-radius:12px;">
+            <div class="ac-card-header d-flex justify-content-between align-items-center bg-white border-bottom py-3 px-4">
+                <div>
+                    <h3 class="ac-card-title fs-6 fw-bold mb-0 text-dark">📊 Grafik Penjualan Harian (7 Hari Terakhir)</h3>
+                    <small class="text-muted">Performa harian kas masuk & nilai pesanan (WIB)</small>
+                </div>
+                <span class="badge bg-light text-dark border">Harian</span>
+            </div>
+            <div class="ac-card-body p-4">
+                @if(! $hasDailyChartData)
+                    <div class="p-4 text-center text-muted my-3" id="emptyDailyChart">
+                        <div class="mb-2" style="font-size: 2.2rem;">📊</div>
+                        <h6 class="fw-bold text-secondary">Belum Ada Transaksi Penjualan 7 Hari Terakhir</h6>
+                        <p class="small text-muted mb-0">Grafik akan terisi secara otomatis begitu pembayaran sewa dikonfirmasi lunas.</p>
+                    </div>
+                @else
+                    <div style="position: relative; height: 260px; width: 100%;">
+                        <canvas id="chartPenjualanHarian"></canvas>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafik Tren Penjualan Bulanan -->
+    <div class="col-12 col-lg-6">
+        <div class="ac-card h-100 shadow-sm border-0" style="border-radius:12px;">
+            <div class="ac-card-header d-flex justify-content-between align-items-center bg-white border-bottom py-3 px-4">
+                <div>
+                    <h3 class="ac-card-title fs-6 fw-bold mb-0 text-dark">📈 Grafik Tren Penjualan Bulanan (6 Bulan Terakhir)</h3>
+                    <small class="text-muted">Tren akumulasi penerimaan dana dan volume sewa (WIB)</small>
+                </div>
+                <span class="badge bg-light text-dark border">Bulanan</span>
+            </div>
+            <div class="ac-card-body p-4">
+                @if(! $hasMonthlyChartData)
+                    <div class="p-4 text-center text-muted my-3" id="emptyMonthlyChart">
+                        <div class="mb-2" style="font-size: 2.2rem;">📈</div>
+                        <h6 class="fw-bold text-secondary">Belum Ada Riwayat Penjualan 6 Bulan Terakhir</h6>
+                        <p class="small text-muted mb-0">Tren penjualan bulanan akan muncul saat ada riwayat transaksi lunas tercatat.</p>
+                    </div>
+                @else
+                    <div style="position: relative; height: 260px; width: 100%;">
+                        <canvas id="chartPenjualanBulanan"></canvas>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Riwayat Pesanan Pelanggan (Read-Only) -->
 <x-data-table title="Riwayat Pesanan Pelanggan (Pengawasan Pemilik)" subtitle="Pantau aktivitas penyewaan dan pembayaran pelanggan secara transparan" searchId="searchOwnerOrders">
     <x-slot:actions>
@@ -358,3 +413,147 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="{{ asset('vendor/chartjs/chart.umd.min.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    @if($hasDailyChartData)
+    const ctxHarian = document.getElementById('chartPenjualanHarian');
+    if (ctxHarian && typeof Chart !== 'undefined') {
+        const labelsHarian = @json(array_column($grafikHarian, 'label'));
+        const dataUangHarian = @json(array_column($grafikHarian, 'uang_diterima'));
+        const dataNilaiHarian = @json(array_column($grafikHarian, 'nilai_pesanan'));
+
+        new Chart(ctxHarian, {
+            type: 'bar',
+            data: {
+                labels: labelsHarian,
+                datasets: [
+                    {
+                        label: 'Uang Diterima (Rp)',
+                        data: dataUangHarian,
+                        backgroundColor: 'rgba(40, 167, 69, 0.75)',
+                        borderColor: '#28a745',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Nilai Pesanan (Rp)',
+                        data: dataNilaiHarian,
+                        backgroundColor: 'rgba(13, 110, 253, 0.25)',
+                        borderColor: '#0d6efd',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        type: 'line',
+                        tension: 0.2,
+                        pointRadius: 3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                let val = context.raw || 0;
+                                return label + ': Rp ' + new Intl.NumberFormat('id-ID').format(val);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(val) {
+                                return 'Rp ' + (val >= 1000000 ? (val/1000000) + 'jt' : (val >= 1000 ? (val/1000) + 'rb' : val));
+                            },
+                            font: { size: 10 }
+                        }
+                    },
+                    x: {
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+    @endif
+
+    @if($hasMonthlyChartData)
+    const ctxBulanan = document.getElementById('chartPenjualanBulanan');
+    if (ctxBulanan && typeof Chart !== 'undefined') {
+        const labelsBulanan = @json(array_column($grafikBulanan, 'label'));
+        const dataUangBulanan = @json(array_column($grafikBulanan, 'uang_diterima'));
+        const dataNilaiBulanan = @json(array_column($grafikBulanan, 'nilai_pesanan'));
+
+        new Chart(ctxBulanan, {
+            type: 'line',
+            data: {
+                labels: labelsBulanan,
+                datasets: [
+                    {
+                        label: 'Uang Diterima (Rp)',
+                        data: dataUangBulanan,
+                        backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                        borderColor: '#198754',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#198754',
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'Nilai Pesanan (Rp)',
+                        data: dataNilaiBulanan,
+                        backgroundColor: 'transparent',
+                        borderColor: '#fd7e14',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        pointBackgroundColor: '#fd7e14',
+                        pointRadius: 3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                let val = context.raw || 0;
+                                return label + ': Rp ' + new Intl.NumberFormat('id-ID').format(val);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(val) {
+                                return 'Rp ' + (val >= 1000000 ? (val/1000000) + 'jt' : (val >= 1000 ? (val/1000) + 'rb' : val));
+                            },
+                            font: { size: 10 }
+                        }
+                    },
+                    x: {
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+    @endif
+});
+</script>
+@endpush

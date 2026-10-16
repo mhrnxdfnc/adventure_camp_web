@@ -255,4 +255,79 @@ class PemilikDashboardTest extends TestCase
         // Transaksi bulan lalu tidak boleh muncul
         $response->assertDontSee('PAY-PAST-003');
     }
+
+    /**
+     * Uji grafik penjualan harian dan bulanan menampilkan data sesuai perhitungan backend.
+     */
+    public function test_pemilik_can_view_charts_with_backend_calculated_data(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $admin = User::where('username', 'admin')->first();
+        $pelanggan = Pelanggan::find(1);
+        $alat = Alat::find('ALT001');
+
+        $nowJakarta = Carbon::now('Asia/Jakarta');
+
+        $sewa = Penyewaan::create([
+            'no_transaksi' => 'TRX-CHART-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => $nowJakarta->toDateString(),
+            'tanggal_kembali' => $nowJakarta->toDateString(),
+            'status_penyewaan' => 'Disetujui',
+        ]);
+        $sewa->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 350000,
+        ]);
+        Pembayaran::create([
+            'no_pembayaran' => 'PAY-CHART-001',
+            'no_transaksi' => 'TRX-CHART-001',
+            'total_biaya' => 350000,
+            'jumlah_pembayaran' => 350000,
+            'metode_pembayaran' => 'QRIS',
+            'tanggal_pembayaran' => $nowJakarta,
+            'status_pembayaran' => 'Lunas',
+            'id_admin' => $admin->id_user,
+            'waktu_konfirmasi' => $nowJakarta,
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Grafik Penjualan Harian (7 Hari Terakhir)');
+        $response->assertSee('Grafik Tren Penjualan Bulanan (6 Bulan Terakhir)');
+        $response->assertSee('id="chartPenjualanHarian"', false);
+        $response->assertSee('id="chartPenjualanBulanan"', false);
+
+        // Pastikan variabel dataset grafik tersedia dan sesuai nilai kalkulasi
+        $response->assertViewHas('grafikHarian', function ($harian) {
+            $todayEntry = end($harian);
+
+            return $todayEntry['total_transaksi'] === 1 && (float) $todayEntry['uang_diterima'] === 350000.0;
+        });
+
+        $response->assertViewHas('grafikBulanan', function ($bulanan) {
+            $currentMonthEntry = end($bulanan);
+
+            return $currentMonthEntry['total_transaksi'] === 1 && (float) $currentMonthEntry['uang_diterima'] === 350000.0;
+        });
+    }
+
+    /**
+     * Uji kondisi kosong pada grafik jika belum ada data penjualan.
+     */
+    public function test_pemilik_dashboard_empty_state_when_no_chart_data(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('id="emptyDailyChart"', false);
+        $response->assertSee('id="emptyMonthlyChart"', false);
+        $response->assertSee('Belum Ada Transaksi Penjualan 7 Hari Terakhir');
+        $response->assertSee('Belum Ada Riwayat Penjualan 6 Bulan Terakhir');
+    }
 }
