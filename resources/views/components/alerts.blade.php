@@ -46,7 +46,7 @@
     </div>
 @endif
 
-@if ($errors->any())
+@if (isset($errors) && $errors->any())
     <div class="alert alert-danger alert-dismissible fade show mb-3 shadow-sm border-0" role="alert" style="border-radius:10px;">
         <div class="d-flex align-items-center gap-2 mb-1">
             <svg width="20" height="20" fill="currentColor" class="flex-shrink-0" viewBox="0 0 20 20">
