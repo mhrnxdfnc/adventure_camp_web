@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alat;
 use App\Models\Pembayaran;
+use App\Models\Penyewaan;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -124,6 +126,15 @@ class PemilikDashboardController extends Controller
 
         $hasMonthlyChartData = collect($grafikBulanan)->sum('total_transaksi') > 0 || collect($grafikBulanan)->sum('uang_diterima') > 0;
 
+        // 5 & 6. Daftar Alat Rusak dan Perlu Perbaikan (Real Database)
+        $alatRusakList = Alat::where('kondisi', 'Rusak')->orderBy('kode_alat')->get();
+        $alatPerluPerbaikanList = Alat::where('kondisi', 'Perlu Perbaikan')->orderBy('kode_alat')->get();
+
+        // 7. Ringkasan Transaksi Pelanggan (Real Database, Read-Only)
+        $pesananList = Penyewaan::with(['pelanggan', 'pembayaran', 'detailPenyewaan.alat'])
+            ->orderBy('tanggal_sewa', 'desc')
+            ->get();
+
         return view('pemilik.dashboard', [
             'todayDateFormatted' => $today->translatedFormat('d F Y'),
             'currentMonthFormatted' => Carbon::now($timezone)->translatedFormat('F Y'),
@@ -139,6 +150,9 @@ class PemilikDashboardController extends Controller
             'hasDailyChartData' => $hasDailyChartData,
             'grafikBulanan' => $grafikBulanan,
             'hasMonthlyChartData' => $hasMonthlyChartData,
+            'alatRusakList' => $alatRusakList,
+            'alatPerluPerbaikanList' => $alatPerluPerbaikanList,
+            'pesananList' => $pesananList,
         ]);
     }
 }

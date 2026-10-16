@@ -309,36 +309,30 @@
         </tr>
     </thead>
     <tbody>
-        <tr>
-            <td><strong>TRX-20261011-001</strong></td>
-            <td>Andi Pratama</td>
-            <td>12 Okt 2026</td>
-            <td>2 hari</td>
-            <td><strong>Rp 610.000</strong></td>
-            <td>Cash (Kasir)</td>
-            <td><x-status-badge status="Lunas" /></td>
-            <td><x-status-badge status="Selesai" /></td>
-        </tr>
-        <tr>
-            <td><strong>TRX-20261006-001</strong></td>
-            <td>Budi Santoso</td>
-            <td>06 Okt 2026</td>
-            <td>1 hari</td>
-            <td><strong>Rp 150.000</strong></td>
-            <td>Transfer Bank</td>
-            <td><x-status-badge status="Lunas" /></td>
-            <td><x-status-badge status="Selesai" /></td>
-        </tr>
-        <tr>
-            <td><strong>TRX-20261005-001</strong></td>
-            <td>Siti Aulia</td>
-            <td>05 Okt 2026</td>
-            <td>2 hari</td>
-            <td><strong>Rp 380.000</strong></td>
-            <td>QRIS (Kasir)</td>
-            <td><x-status-badge status="Lunas" /></td>
-            <td><x-status-badge status="Selesai" /></td>
-        </tr>
+        @forelse($pesananList as $trx)
+            <tr>
+                <td><strong>{{ $trx->no_transaksi }}</strong></td>
+                <td>{{ $trx->pelanggan?->nama_pelanggan ?? 'Pelanggan' }}</td>
+                <td>{{ $trx->tanggal_sewa ? \Carbon\Carbon::parse($trx->tanggal_sewa)->format('d M Y') : '-' }}</td>
+                <td>{{ $trx->durasi_hari }} hari</td>
+                <td><strong>Rp {{ number_format((float) $trx->total_biaya, 0, ',', '.') }}</strong></td>
+                <td>
+                    <span class="badge bg-light text-dark border">{{ $trx->pembayaran?->metode_pembayaran ?? '-' }}</span>
+                </td>
+                <td>
+                    <x-status-badge :status="$trx->status_pembayaran" />
+                </td>
+                <td>
+                    <x-status-badge :status="$trx->status_penyewaan" />
+                </td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                    Belum ada riwayat transaksi penyewaan pelanggan yang tercatat di sistem.
+                </td>
+            </tr>
+        @endforelse
     </tbody>
 </x-data-table>
 
@@ -346,8 +340,8 @@
 <div class="row g-3">
     <div class="col-12 col-lg-6">
         <div class="ac-card h-100">
-            <div class="ac-card-header">
-                <h3 class="ac-card-title text-danger">⚠️ Laporan Alat Rusak & Afkir</h3>
+            <div class="ac-card-header d-flex justify-content-between align-items-center">
+                <h3 class="ac-card-title text-danger fs-6 fw-bold mb-0">⚠️ Laporan Alat Rusak & Afkir</h3>
                 <span class="badge bg-danger">Read-Only</span>
             </div>
             <div class="ac-card-body p-0">
@@ -357,17 +351,27 @@
                             <tr>
                                 <th>Kode</th>
                                 <th>Nama Alat</th>
+                                <th>Kategori</th>
                                 <th>Kondisi</th>
                                 <th>Stok Fisik</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>ALT004</td>
-                                <td>Matras Camping</td>
-                                <td><x-status-badge status="Rusak" /></td>
-                                <td>1 unit</td>
-                            </tr>
+                            @forelse($alatRusakList as $alat)
+                                <tr>
+                                    <td><code>{{ $alat->kode_alat }}</code></td>
+                                    <td>{{ $alat->nama_alat }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ $alat->kategori }}</span></td>
+                                    <td><x-status-badge status="Rusak" /></td>
+                                    <td>{{ $alat->stok }} unit</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center py-3 text-muted">
+                                        Tidak ada alat dengan kondisi rusak di inventaris.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -377,8 +381,8 @@
 
     <div class="col-12 col-lg-6">
         <div class="ac-card h-100">
-            <div class="ac-card-header">
-                <h3 class="ac-card-title text-warning">🔧 Alat Perlu Perbaikan</h3>
+            <div class="ac-card-header d-flex justify-content-between align-items-center">
+                <h3 class="ac-card-title text-warning fs-6 fw-bold mb-0">🔧 Alat Perlu Perbaikan</h3>
                 <span class="badge bg-warning text-dark">Read-Only</span>
             </div>
             <div class="ac-card-body p-0">
@@ -388,23 +392,27 @@
                             <tr>
                                 <th>Kode</th>
                                 <th>Nama Alat</th>
+                                <th>Kategori</th>
                                 <th>Kondisi</th>
                                 <th>Stok Fisik</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>ALT001</td>
-                                <td>Tenda Dome 4 Orang</td>
-                                <td><x-status-badge status="Perlu Perbaikan" /></td>
-                                <td>1 unit</td>
-                            </tr>
-                            <tr>
-                                <td>ALT003</td>
-                                <td>Carrier 60L</td>
-                                <td><x-status-badge status="Perlu Perbaikan" /></td>
-                                <td>2 unit</td>
-                            </tr>
+                            @forelse($alatPerluPerbaikanList as $alat)
+                                <tr>
+                                    <td><code>{{ $alat->kode_alat }}</code></td>
+                                    <td>{{ $alat->nama_alat }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ $alat->kategori }}</span></td>
+                                    <td><x-status-badge status="Perlu Perbaikan" /></td>
+                                    <td>{{ $alat->stok }} unit</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center py-3 text-muted">
+                                        Tidak ada alat yang memerlukan perbaikan saat ini.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>

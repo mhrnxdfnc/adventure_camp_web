@@ -330,4 +330,101 @@ class PemilikDashboardTest extends TestCase
         $response->assertSee('Belum Ada Transaksi Penjualan 7 Hari Terakhir');
         $response->assertSee('Belum Ada Riwayat Penjualan 6 Bulan Terakhir');
     }
+
+    /**
+     * Uji daftar alat rusak dan alat perlu perbaikan ditampilkan sesuai database secara akurat.
+     */
+    public function test_pemilik_can_view_damaged_and_repair_equipment_from_database(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        // Bersihkan atau buat alat dengan kondisi berbeda
+        Alat::create([
+            'kode_alat' => 'ALT-DAMAGED-99',
+            'nama_alat' => 'Tenda Robek Total',
+            'kategori' => 'Tenda',
+            'stok' => 2,
+            'kondisi' => 'Rusak',
+            'tarif_sewa' => 50000,
+        ]);
+
+        Alat::create([
+            'kode_alat' => 'ALT-REPAIR-88',
+            'nama_alat' => 'Kompor Pematik Lepas',
+            'kategori' => 'Peralatan Masak',
+            'stok' => 3,
+            'kondisi' => 'Perlu Perbaikan',
+            'tarif_sewa' => 30000,
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Laporan Alat Rusak');
+        $response->assertSee('ALT-DAMAGED-99');
+        $response->assertSee('Tenda Robek Total');
+        $response->assertSee('2 unit');
+
+        $response->assertSee('Alat Perlu Perbaikan');
+        $response->assertSee('ALT-REPAIR-88');
+        $response->assertSee('Kompor Pematik Lepas');
+        $response->assertSee('3 unit');
+    }
+
+    /**
+     * Uji ringkasan transaksi pelanggan tampil dari database tanpa tombol operasional / persetujuan.
+     */
+    public function test_pemilik_can_view_customer_transactions_summary(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $pelanggan = Pelanggan::find(1);
+        $alat = Alat::find('ALT001');
+
+        $sewa = Penyewaan::create([
+            'no_transaksi' => 'TRX-SUMMARY-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-16',
+            'tanggal_kembali' => '2026-10-18',
+            'status_penyewaan' => 'Sedang Disewa',
+        ]);
+        $sewa->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 75000,
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('TRX-SUMMARY-001');
+        $response->assertSee('Sedang Disewa');
+    }
+
+    /**
+     * Uji dashboard Pemilik strictly read-only: tidak ada tombol persetujuan/operasional dan mutasi dilarang.
+     */
+    public function test_pemilik_dashboard_has_strictly_no_operational_or_approval_buttons(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        // Dashboard Pemilik tidak boleh memiliki tombol operasional atau persetujuan
+        $response->assertDontSee('Setujui Pesanan');
+        $response->assertDontSee('Tolak Pesanan');
+        $response->assertDontSee('Konfirmasi Pembayaran');
+        $response->assertDontSee('Proses Pengambilan');
+        $response->assertDontSee('Proses Pengembalian');
+        $response->assertDontSee('Sesuaikan Stok');
+        $response->assertDontSee('Tambah Alat');
+        $response->assertDontSee('Edit Alat');
+        $response->assertDontSee('Hapus Alat');
+
+        // Pemilik tidak dapat melakukan aksi POST / mutasi data
+        $this->actingAs($pemilik)
+            ->post(route('pemilik.test-action'))
+            ->assertStatus(403);
+    }
 }
