@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Alat;
 use App\Models\DetailPenyewaan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class InventarisController extends Controller
@@ -150,7 +154,64 @@ class InventarisController extends Controller
      */
     public function adjustStock(Request $request, string $kode_alat): RedirectResponse
     {
-        return redirect()->route('admin.inventaris.show', $kode_alat)
-            ->with('info', 'Fungsi penyesuaian stok disiapkan.');
+        $request->validate([
+            'tipe_penyesuaian' => ['required', 'in:tambah,kurang'],
+            'jumlah' => ['required', 'integer', 'min:1'],
+            'alasan' => ['required', 'string', 'max:255'],
+        ], [
+            'tipe_penyesuaian.required' => 'Pilih jenis penyesuaian stok (Tambah atau Kurang).',
+            'jumlah.required' => 'Jumlah unit penyesuaian wajib diisi.',
+            'jumlah.min' => 'Jumlah unit penyesuaian minimal 1.',
+            'alasan.required' => 'Alasan penyesuaian stok wajib diisi demi integritas audit stok.',
+        ]);
+
+        $tipe = $request->input('tipe_penyesuaian');
+        $jumlah = (int) $request->input('jumlah');
+        $alasan = trim((string) $request->input('alasan'));
+
+        return DB::transaction(function () use ($kode_alat, $tipe, $jumlah, $alasan) {
+            $alat = Alat::where('kode_alat', $kode_alat)->lockForUpdate()->firstOrFail();
+
+            $stokSebelum = (int) $alat->stok;
+            $delta = ($tipe === 'tambah') ? $jumlah : -$jumlah;
+            $stokSesudah = $stokSebelum + $delta;
+
+            // Cegah stok negatif
+            if ($stokSesudah < 0) {
+                return back()
+                    ->withErrors(['jumlah' => "Penyesuaian stok ditolak karena akan menyebabkan stok fisik di toko menjadi negatif ({$stokSesudah})."])
+                    ->withInput();
+            }
+
+            // Perbarui stok fisik alat
+            $alat->stok = $stokSesudah;
+            $alat->save();
+
+            // Catat ke Audit Trail ActivityLog (Waktu dan pengguna tercatat)
+            $actionName = ($tipe === 'tambah') ? 'Penambahan Stok Manual' : 'Pengurangan Stok Manual';
+            ActivityLog::record(
+                Auth::id(),
+                $actionName,
+                'Inventaris',
+                "Kode Alat: {$alat->kode_alat}, Perubahan: ".($delta > 0 ? "+{$delta}" : (string) $delta)." unit, Stok: {$stokSebelum} -> {$stokSesudah}, Alasan: {$alasan}"
+            );
+
+            // Jika tabel riwayat_stok sudah ada, catat juga ke log inventaris
+            if (Schema::hasTable('riwayat_stok')) {
+                DB::table('riwayat_stok')->insert([
+                    'kode_alat' => $alat->kode_alat,
+                    'jenis_perubahan' => ($tipe === 'tambah') ? 'Penambahan Manual' : 'Pengurangan Manual',
+                    'stok_sebelum' => $stokSebelum,
+                    'jumlah_perubahan' => $delta,
+                    'stok_sesudah' => $stokSesudah,
+                    'alasan' => $alasan,
+                    'id_user' => Auth::id(),
+                    'created_at' => now(),
+                ]);
+            }
+
+            return redirect()->route('admin.inventaris.show', $alat->kode_alat)
+                ->with('success', "Stok alat {$alat->nama_alat} ({$alat->kode_alat}) berhasil diperbarui: {$stokSebelum} unit &rarr; {$stokSesudah} unit.");
+        });
     }
 }
