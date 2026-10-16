@@ -36,7 +36,7 @@ class InventarisAdjustmentTest extends TestCase
         // Pastikan waktu dan admin tercatat di audit trail ActivityLog
         $this->assertDatabaseHas('activity_logs', [
             'id_user' => $admin->id_user,
-            'aktivitas' => 'Penambahan Stok Manual',
+            'aktivitas' => 'Penambahan Manual',
             'modul' => 'Inventaris',
         ]);
     }
@@ -65,7 +65,7 @@ class InventarisAdjustmentTest extends TestCase
 
         $this->assertDatabaseHas('activity_logs', [
             'id_user' => $admin->id_user,
-            'aktivitas' => 'Pengurangan Stok Manual',
+            'aktivitas' => 'Pengurangan Manual',
             'modul' => 'Inventaris',
         ]);
     }

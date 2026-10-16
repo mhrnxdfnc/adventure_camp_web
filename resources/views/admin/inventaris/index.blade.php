@@ -17,9 +17,13 @@
             <p class="text-muted small mb-0">Pantau ketersediaan stok fisik di store, unit siap sewa, unit yang sedang dialokasikan pelanggan, serta kondisi fisik alat.</p>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="{{ route('admin.inventaris.riwayat') }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+            <a href="{{ route('admin.inventaris.riwayat') }}" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1">
                 <span>📜</span>
-                <span>Lihat Riwayat Mutasi Stok</span>
+                <span>Riwayat Mutasi Stok</span>
+            </a>
+            <a href="{{ route('admin.inventaris.pembelian.index') }}" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                <span>🛒</span>
+                <span>Pembelian Supplier</span>
             </a>
         </div>
     </div>

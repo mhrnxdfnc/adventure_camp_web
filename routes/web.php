@@ -7,6 +7,7 @@ use App\Http\Controllers\InventarisController;
 use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
+use App\Http\Controllers\PembelianInventarisController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
 
@@ -67,6 +68,13 @@ Route::middleware(['auth', 'role:Admin'])
         // Modul Inventaris & Pemantauan Stok
         Route::get('/inventaris', [InventarisController::class, 'index'])->name('inventaris.index');
         Route::get('/inventaris/riwayat', [InventarisController::class, 'riwayatIndex'])->name('inventaris.riwayat');
+
+        // Pembelian Stok Inventaris dari Supplier
+        Route::get('/inventaris/pembelian', [PembelianInventarisController::class, 'index'])->name('inventaris.pembelian.index');
+        Route::get('/inventaris/pembelian/tambah', [PembelianInventarisController::class, 'create'])->name('inventaris.pembelian.create');
+        Route::post('/inventaris/pembelian', [PembelianInventarisController::class, 'store'])->name('inventaris.pembelian.store');
+        Route::get('/inventaris/pembelian/{no_pembelian}', [PembelianInventarisController::class, 'show'])->name('inventaris.pembelian.show');
+
         Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
         Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
     });
