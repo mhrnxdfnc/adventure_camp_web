@@ -67,8 +67,15 @@
                     📈
                 </div>
             </div>
-            <div class="ac-stat-value">{{ $penjualanBulanIniCount ?? 0 }}</div>
-            <div class="ac-stat-sub">Total transaksi bulan berjalan</div>
+            <div class="ac-stat-value" id="valPenjualanBulanIni">{{ $penjualanBulanIniCount }}</div>
+            <div class="ac-stat-sub text-muted">{{ $penjualanBulanIniCount }} Transaksi bulan berjalan</div>
+            <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Nilai Pesanan:</span>
+                <span class="fw-bold small text-dark">Rp {{ number_format($nilaiPesananBulanIni, 0, ',', '.') }}</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-warning w-100 mt-2 text-dark" data-bs-toggle="modal" data-bs-target="#modalRincianBulanIni" style="font-size: 0.75rem;">
+                🔍 Lihat Rincian Bulan Ini
+            </button>
         </div>
     </div>
 
@@ -81,8 +88,15 @@
                     🏦
                 </div>
             </div>
-            <div class="ac-stat-value" style="font-size:1.45rem;">Rp {{ number_format($pendapatanBulanIni ?? 0, 0, ',', '.') }}</div>
-            <div class="ac-stat-sub">Dana masuk sah terverifikasi</div>
+            <div class="ac-stat-value" id="valPendapatanBulanIni" style="font-size:1.45rem;">Rp {{ number_format($pendapatanBulanIni, 0, ',', '.') }}</div>
+            <div class="ac-stat-sub text-muted">Dana masuk sah terverifikasi</div>
+            <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Uang Masuk Nyata:</span>
+                <span class="fw-bold small text-success">Rp {{ number_format($pendapatanBulanIni, 0, ',', '.') }}</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success w-100 mt-2" data-bs-toggle="modal" data-bs-target="#modalRincianBulanIni" style="font-size: 0.75rem;">
+                🔍 Rincian Penerimaan
+            </button>
         </div>
     </div>
 </div>
@@ -138,6 +152,73 @@
                                         <td>{{ $bayar->penyewaan?->pelanggan?->nama_pelanggan ?? 'Umum' }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ $bayar->metode_pembayaran }}</span></td>
                                         <td><small class="text-muted">{{ $bayar->waktu_konfirmasi ? \Carbon\Carbon::parse($bayar->waktu_konfirmasi)->timezone('Asia/Jakarta')->format('H:i:s') . ' WIB' : '-' }}</small></td>
+                                        <td class="text-end">Rp {{ number_format((float) ($bayar->total_biaya > 0 ? $bayar->total_biaya : ($bayar->penyewaan?->total_biaya ?? 0)), 0, ',', '.') }}</td>
+                                        <td class="text-end fw-bold text-success">Rp {{ number_format((float) $bayar->jumlah_pembayaran, 0, ',', '.') }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Rincian Bulan Ini -->
+<div class="modal fade" id="modalRincianBulanIni" tabindex="-1" aria-labelledby="modalRincianBulanIniLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRincianBulanIniLabel">📋 Rincian Penjualan & Penerimaan Bulan Ini ({{ $currentMonthFormatted }})</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 bg-light border-bottom d-flex flex-wrap gap-4 justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted d-block">Total Transaksi Lunas</small>
+                        <strong class="text-dark">{{ $penjualanBulanIniCount }} Transaksi</strong>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Total Nilai Pesanan</small>
+                        <strong class="text-dark">Rp {{ number_format($nilaiPesananBulanIni, 0, ',', '.') }}</strong>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Uang Benar-benar Diterima</small>
+                        <strong class="text-success">Rp {{ number_format($pendapatanBulanIni, 0, ',', '.') }}</strong>
+                    </div>
+                </div>
+
+                @if($rincianBulanIni->isEmpty())
+                    <div class="p-4 text-center text-muted">
+                        <div class="mb-2" style="font-size: 2rem;">📭</div>
+                        <p class="mb-0">Belum ada transaksi pembayaran yang dikonfirmasi pada bulan berjalan ({{ $currentMonthFormatted }}).</p>
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>No. Pembayaran</th>
+                                    <th>No. Transaksi</th>
+                                    <th>Pelanggan</th>
+                                    <th>Metode</th>
+                                    <th>Waktu Konfirmasi</th>
+                                    <th class="text-end">Nilai Pesanan</th>
+                                    <th class="text-end">Uang Diterima</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($rincianBulanIni as $bayar)
+                                    <tr>
+                                        <td><code>{{ $bayar->no_pembayaran }}</code></td>
+                                        <td><strong>{{ $bayar->no_transaksi }}</strong></td>
+                                        <td>{{ $bayar->penyewaan?->pelanggan?->nama_pelanggan ?? 'Umum' }}</td>
+                                        <td><span class="badge bg-light text-dark border">{{ $bayar->metode_pembayaran }}</span></td>
+                                        <td><small class="text-muted">{{ $bayar->waktu_konfirmasi ? \Carbon\Carbon::parse($bayar->waktu_konfirmasi)->timezone('Asia/Jakarta')->format('d M H:i') . ' WIB' : '-' }}</small></td>
                                         <td class="text-end">Rp {{ number_format((float) ($bayar->total_biaya > 0 ? $bayar->total_biaya : ($bayar->penyewaan?->total_biaya ?? 0)), 0, ',', '.') }}</td>
                                         <td class="text-end fw-bold text-success">Rp {{ number_format((float) $bayar->jumlah_pembayaran, 0, ',', '.') }}</td>
                                     </tr>

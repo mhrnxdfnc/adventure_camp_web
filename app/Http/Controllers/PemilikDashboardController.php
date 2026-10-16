@@ -37,12 +37,41 @@ class PemilikDashboardController extends Controller
             return (float) ($p->total_biaya > 0 ? $p->total_biaya : ($p->penyewaan?->total_biaya ?? 0));
         });
 
+        // 2. Ringkasan Penjualan Bulan Berjalan (MTD berdasarkan pembayaran Lunas)
+        $startOfMonth = Carbon::now($timezone)->startOfMonth();
+        $endOfMonth = Carbon::now($timezone)->endOfMonth();
+        $startOfMonthDate = $startOfMonth->toDateString();
+        $endOfMonthDate = $endOfMonth->toDateString();
+
+        $pembayaranBulanIni = Pembayaran::with(['penyewaan.pelanggan', 'penyewaan.detailPenyewaan.alat'])
+            ->where('status_pembayaran', 'Lunas')
+            ->where(function ($q) use ($startOfMonthDate, $endOfMonthDate) {
+                $q->whereBetween('waktu_konfirmasi', [$startOfMonthDate.' 00:00:00', $endOfMonthDate.' 23:59:59'])
+                    ->orWhere(function ($sub) use ($startOfMonthDate, $endOfMonthDate) {
+                        $sub->whereNull('waktu_konfirmasi')
+                            ->whereBetween('tanggal_pembayaran', [$startOfMonthDate.' 00:00:00', $endOfMonthDate.' 23:59:59']);
+                    });
+            })
+            ->orderByDesc('waktu_konfirmasi')
+            ->get();
+
+        $penjualanBulanIniCount = $pembayaranBulanIni->count();
+        $pendapatanBulanIni = (float) $pembayaranBulanIni->sum('jumlah_pembayaran');
+        $nilaiPesananBulanIni = (float) $pembayaranBulanIni->sum(function ($p) {
+            return (float) ($p->total_biaya > 0 ? $p->total_biaya : ($p->penyewaan?->total_biaya ?? 0));
+        });
+
         return view('pemilik.dashboard', [
             'todayDateFormatted' => $today->translatedFormat('d F Y'),
+            'currentMonthFormatted' => Carbon::now($timezone)->translatedFormat('F Y'),
             'penjualanHariIniCount' => $penjualanHariIniCount,
             'pendapatanHariIni' => $pendapatanHariIni,
             'nilaiPesananHariIni' => $nilaiPesananHariIni,
             'rincianHariIni' => $pembayaranHariIni,
+            'penjualanBulanIniCount' => $penjualanBulanIniCount,
+            'pendapatanBulanIni' => $pendapatanBulanIni,
+            'nilaiPesananBulanIni' => $nilaiPesananBulanIni,
+            'rincianBulanIni' => $pembayaranBulanIni,
         ]);
     }
 }
