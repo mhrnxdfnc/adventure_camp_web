@@ -97,13 +97,32 @@
             <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
         </div>
 
-        <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pembayaran selesai">
-            <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-            </svg>
-            <span>Pembayaran</span>
-            <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
-        </div>
+        @auth
+            @if(Auth::user()->isAdmin())
+                <a href="{{ route('admin.pembayaran.index') }}" class="ac-menu-item {{ request()->is('admin/pembayaran*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                    <span>Verifikasi Pembayaran</span>
+                </a>
+            @else
+                <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pembayaran selesai">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                    <span>Pembayaran</span>
+                    <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+                </div>
+            @endif
+        @else
+            <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pembayaran selesai">
+                <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                </svg>
+                <span>Pembayaran</span>
+                <small class="badge bg-secondary ms-auto" style="font-size: 0.65rem;">Tahap 2</small>
+            </div>
+        @endauth
 
         <div class="ac-menu-item text-muted" style="opacity: 0.6; cursor: not-allowed;" title="Akan aktif setelah modul pengembalian selesai">
             <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

@@ -21,16 +21,18 @@
 
     <!-- Stat 2: Pembayaran Menunggu Verifikasi -->
     <div class="col-12 col-sm-6 col-xl-3">
-        <div class="ac-stat-card">
-            <div class="ac-stat-head">
-                <span class="ac-stat-label">Verifikasi Pembayaran</span>
-                <div class="ac-stat-icon-wrap" style="background-color: #e0f2fe; color: #0369a1;">
-                    💳
+        <a href="{{ route('admin.pembayaran.index') }}" class="text-decoration-none text-reset">
+            <div class="ac-stat-card">
+                <div class="ac-stat-head">
+                    <span class="ac-stat-label">Verifikasi Pembayaran</span>
+                    <div class="ac-stat-icon-wrap" style="background-color: #e0f2fe; color: #0369a1;">
+                        💳
+                    </div>
                 </div>
+                <div class="ac-stat-value">1</div>
+                <div class="ac-stat-sub">Bukti transfer belum diperiksa</div>
             </div>
-            <div class="ac-stat-value">1</div>
-            <div class="ac-stat-sub">Bukti transfer belum diperiksa</div>
-        </div>
+        </a>
     </div>
 
     <!-- Stat 3: Sedang Disewa -->

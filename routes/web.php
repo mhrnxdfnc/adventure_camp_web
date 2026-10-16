@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPembayaranController;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\KatalogController;
@@ -45,6 +46,12 @@ Route::middleware(['auth', 'role:Admin'])
 
         // CRUD Master Data Alat Camping
         Route::resource('alat', AlatController::class)->parameters(['alat' => 'kode_alat']);
+
+        // Verifikasi Pembayaran Transaksi
+        Route::get('/pembayaran', [AdminPembayaranController::class, 'index'])->name('pembayaran.index');
+        Route::get('/pembayaran/{no_transaksi}', [AdminPembayaranController::class, 'show'])->name('pembayaran.show');
+        Route::post('/pembayaran/{no_transaksi}/konfirmasi', [AdminPembayaranController::class, 'konfirmasi'])->name('pembayaran.konfirmasi');
+        Route::post('/pembayaran/{no_transaksi}/tolak', [AdminPembayaranController::class, 'tolak'])->name('pembayaran.tolak');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
