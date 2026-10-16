@@ -132,9 +132,6 @@
                     </thead>
                     <tbody>
                         @foreach($penyewaan->detailPenyewaan as $index => $item)
-                            @php
-                                $subtotalItem = (float) $item->jumlah * (float) $item->tarif_sewa * (int) $penyewaan->durasi_hari;
-                            @endphp
                             <tr>
                                 <td class="ps-4 text-muted">{{ $index + 1 }}</td>
                                 <td><code>{{ $item->kode_alat }}</code></td>
@@ -143,7 +140,7 @@
                                 <td class="text-end font-monospace">Rp {{ number_format((float) $item->tarif_sewa, 0, ',', '.') }}</td>
                                 <td class="text-center fw-bold">{{ $item->jumlah }} unit</td>
                                 <td class="text-center text-muted">{{ $penyewaan->durasi_hari }} hari</td>
-                                <td class="text-end pe-4 fw-bold font-monospace text-dark">Rp {{ number_format($subtotalItem, 0, ',', '.') }}</td>
+                                <td class="text-end pe-4 fw-bold font-monospace text-dark">Rp {{ number_format($item->subtotal_biaya, 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
                     </tbody>

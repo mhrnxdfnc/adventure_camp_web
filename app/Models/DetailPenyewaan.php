@@ -52,4 +52,30 @@ class DetailPenyewaan extends Model
     {
         return $this->belongsTo(Penyewaan::class, 'no_transaksi', 'no_transaksi');
     }
+
+    /**
+     * Total biaya untuk item alat ini = tarif sewa per hari × jumlah alat × lama sewa dalam hari.
+     */
+    public function getSubtotalBiayaAttribute(): float
+    {
+        $durasi = $this->penyewaan?->durasi_hari ?? 1;
+
+        return Penyewaan::hitungTotalBiaya((float) $this->tarif_sewa, (int) $this->jumlah, (int) $durasi);
+    }
+
+    /**
+     * Hitung subtotal untuk durasi hari tertentu
+     */
+    public function hitungSubtotal(int $durasiHari): float
+    {
+        return Penyewaan::hitungTotalBiaya((float) $this->tarif_sewa, (int) $this->jumlah, $durasiHari);
+    }
+
+    /**
+     * Format subtotal dalam format mata uang Rupiah
+     */
+    public function getFormattedSubtotalAttribute(): string
+    {
+        return 'Rp '.number_format($this->subtotal_biaya, 0, ',', '.');
+    }
 }

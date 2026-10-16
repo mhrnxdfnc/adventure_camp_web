@@ -102,9 +102,6 @@
                             </thead>
                             <tbody>
                                 @forelse($penyewaan->detailPenyewaan as $detail)
-                                    @php
-                                        $subtotalItem = (float) $detail->jumlah * (float) $detail->tarif_sewa * $penyewaan->durasi_hari;
-                                    @endphp
                                     <tr>
                                         <td>
                                             <div class="font-weight-bold text-dark">{{ $detail->alat->nama_alat ?? $detail->kode_alat }}</div>
@@ -112,7 +109,7 @@
                                         </td>
                                         <td class="text-center font-weight-bold">{{ $detail->jumlah }} unit</td>
                                         <td class="text-end text-muted small">Rp {{ number_format($detail->tarif_sewa, 0, ',', '.') }}</td>
-                                        <td class="text-end font-weight-bold text-dark">Rp {{ number_format($subtotalItem, 0, ',', '.') }}</td>
+                                        <td class="text-end font-weight-bold text-dark">Rp {{ number_format($detail->subtotal_biaya, 0, ',', '.') }}</td>
                                     </tr>
                                 @empty
                                     <tr>

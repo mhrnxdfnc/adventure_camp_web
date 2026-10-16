@@ -92,7 +92,7 @@
                                         @endif
                                     </span>
                                     <span class="font-monospace text-dark">
-                                        Rp {{ number_format($detail->jumlah * $detail->tarif_sewa * $trx->durasi_hari, 0, ',', '.') }}
+                                        Rp {{ number_format($detail->subtotal_biaya, 0, ',', '.') }}
                                     </span>
                                 </div>
                             @endforeach

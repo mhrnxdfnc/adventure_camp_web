@@ -8,7 +8,6 @@ use App\Models\DetailPenyewaan;
 use App\Models\Pelanggan;
 use App\Models\Pembayaran;
 use App\Models\Penyewaan;
-use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -74,14 +73,12 @@ class PenggunaPesananController extends Controller
                     throw new \DomainException("Stok alat {$alat->nama_alat} tidak mencukupi (tersedia: {$alat->stok} unit, diminta: {$jumlahDiminta} unit).");
                 }
 
-                // Kalkulasi durasi sewa di backend (minimal 1 hari)
-                $sewa = Carbon::parse($validated['tanggal_sewa'])->startOfDay();
-                $kembali = Carbon::parse($validated['tanggal_kembali'])->startOfDay();
-                $durasi = max(1, (int) $sewa->diffInDays($kembali));
+                // Kalkulasi durasi sewa di backend menggunakan satu sumber logika model
+                $durasi = Penyewaan::hitungDurasiHari($validated['tanggal_sewa'], $validated['tanggal_kembali']);
 
-                // Kalkulasi total biaya resmi dari tarif database (Cegah manipulasi harga frontend)
+                // Kalkulasi total biaya resmi dari tarif database: tarif × jumlah × durasi
                 $tarifResmi = (float) $alat->tarif_sewa;
-                $totalBiaya = $tarifResmi * $jumlahDiminta * $durasi;
+                $totalBiaya = Penyewaan::hitungTotalBiaya($tarifResmi, $jumlahDiminta, $durasi);
 
                 // Buat nomor transaksi unik
                 $noTrx = Penyewaan::generateNoTransaksi();

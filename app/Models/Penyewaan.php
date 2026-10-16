@@ -75,18 +75,38 @@ class Penyewaan extends Model
     }
 
     /**
+     * Hitung durasi sewa dalam hari berdasarkan tanggal sewa dan tanggal kembali.
+     * Menggunakan aturan selisih tanggal dalam hari (misalnya sewa tanggal 10 dan kembali tanggal 13 dihitung 3 hari).
+     */
+    public static function hitungDurasiHari($tanggalSewa, $tanggalKembali): int
+    {
+        if (! $tanggalSewa || ! $tanggalKembali) {
+            return 1;
+        }
+
+        $sewa = Carbon::parse($tanggalSewa)->startOfDay();
+        $kembali = Carbon::parse($tanggalKembali)->startOfDay();
+
+        $diff = (int) $sewa->diffInDays($kembali, false);
+
+        return max(1, $diff);
+    }
+
+    /**
+     * Hitung total biaya sewa untuk alat tertentu:
+     * Total biaya setiap alat = tarif sewa per hari × jumlah alat × lama sewa dalam hari.
+     */
+    public static function hitungTotalBiaya(float $tarifSewaPerHari, int $jumlahAlat, int $durasiHari): float
+    {
+        return $tarifSewaPerHari * max(0, $jumlahAlat) * max(1, $durasiHari);
+    }
+
+    /**
      * Hitung durasi sewa dalam hari (minimal 1 hari)
      */
     public function getDurasiHariAttribute(): int
     {
-        if (! $this->tanggal_sewa || ! $this->tanggal_kembali) {
-            return 1;
-        }
-
-        $sewa = Carbon::parse($this->tanggal_sewa)->startOfDay();
-        $kembali = Carbon::parse($this->tanggal_kembali)->startOfDay();
-
-        return max(1, (int) $sewa->diffInDays($kembali));
+        return self::hitungDurasiHari($this->tanggal_sewa, $this->tanggal_kembali);
     }
 
     /**
@@ -109,7 +129,8 @@ class Penyewaan extends Model
     }
 
     /**
-     * Total tagihan dihitung dari SUM(jumlah * tarif_sewa * durasi_hari)
+     * Total tagihan transaksi = jumlah seluruh biaya setiap alat.
+     * Jika transaksi legacy tidak memiliki detail, gunakan nilai total_biaya pembayaran historis.
      */
     public function getTotalBiayaAttribute(): float
     {
@@ -117,7 +138,7 @@ class Penyewaan extends Model
 
         if ($this->relationLoaded('detailPenyewaan') && $this->detailPenyewaan->isNotEmpty()) {
             return (float) $this->detailPenyewaan->sum(function ($item) use ($durasi) {
-                return (float) $item->jumlah * (float) $item->tarif_sewa * $durasi;
+                return self::hitungTotalBiaya((float) $item->tarif_sewa, (int) $item->jumlah, $durasi);
             });
         }
 

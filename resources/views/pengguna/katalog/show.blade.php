@@ -114,7 +114,7 @@
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label font-weight-bold small">Mulai Sewa <span class="text-danger">*</span></label>
-                                <input type="date" name="tanggal_sewa" id="tanggalSewa" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required onchange="hitungRingkasan()">
+                                <input type="date" name="tanggal_sewa" id="tanggalSewa" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required onchange="onTanggalSewaChange()">
                                 @error('tanggal_sewa')
                                     <small class="text-danger d-block mt-1">{{ $message }}</small>
                                 @enderror
@@ -183,6 +183,21 @@
                             hitungRingkasan();
                         }
 
+                        function onTanggalSewaChange() {
+                            const sewaInput = document.getElementById('tanggalSewa');
+                            const kembaliInput = document.getElementById('tanggalKembali');
+                            if (sewaInput.value) {
+                                const d = new Date(sewaInput.value);
+                                d.setDate(d.getDate() + 1);
+                                const minKembali = d.toISOString().split('T')[0];
+                                kembaliInput.min = minKembali;
+                                if (!kembaliInput.value || kembaliInput.value <= sewaInput.value) {
+                                    kembaliInput.value = minKembali;
+                                }
+                            }
+                            hitungRingkasan();
+                        }
+
                         function hitungRingkasan() {
                             const jumlah = parseInt(document.getElementById('inputJumlah').value) || 1;
                             const sewaStr = document.getElementById('tanggalSewa').value;
@@ -193,14 +208,14 @@
                                 const d1 = new Date(sewaStr);
                                 const d2 = new Date(kembaliStr);
                                 const diffTime = d2 - d1;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                                 durasi = Math.max(1, diffDays);
                             }
 
                             const total = tarifPerHari * jumlah * durasi;
 
                             document.getElementById('labelDurasi').textContent = durasi + ' Hari';
-                            document.getElementById('labelKalkulasi').textContent = jumlah + ' × Rp ' + tarifPerHari.toLocaleString('id-ID') + ' × ' + durasi + ' hr';
+                            document.getElementById('labelKalkulasi').textContent = jumlah + ' × Rp ' + tarifPerHari.toLocaleString('id-ID') + ' × ' + durasi + ' hari';
                             document.getElementById('labelTotal').textContent = 'Rp ' + total.toLocaleString('id-ID');
                         }
                     </script>
