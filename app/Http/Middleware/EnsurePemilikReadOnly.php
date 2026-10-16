@@ -12,14 +12,19 @@ class EnsurePemilikReadOnly
     /**
      * Pastikan role Pemilik tidak dapat melakukan mutasi / perubahan data.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check()) {
             $user = Auth::user();
 
-            if ($user->isPemilik() && !in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+            if ($user->isPemilik() && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+                // Izinkan proses logout untuk role Pemilik agar sesi dapat diakhiri secara normal
+                if ($request->routeIs('logout') || $request->is('logout')) {
+                    return $next($request);
+                }
+
                 if ($request->expectsJson()) {
                     return response()->json([
                         'status' => 'error',

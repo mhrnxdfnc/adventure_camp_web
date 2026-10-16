@@ -148,9 +148,9 @@ class AuthTest extends TestCase
     }
 
     /**
-     * Logout berhasil menghapus sesi dan mengarahkan kembali ke login
+     * Logout berhasil menghapus sesi dan mengarahkan kembali ke login untuk Admin
      */
-    public function test_authenticated_user_can_logout(): void
+    public function test_admin_can_logout(): void
     {
         $admin = User::where('username', 'admin')->first();
 
@@ -158,6 +158,57 @@ class AuthTest extends TestCase
 
         $response->assertRedirect('/login');
         $this->assertGuest();
+        $this->get('/admin/dashboard')->assertRedirect('/login');
+    }
+
+    /**
+     * Logout berhasil untuk role Pemilik (tidak terblokir EnsurePemilikReadOnly)
+     */
+    public function test_pemilik_can_logout(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $response = $this->actingAs($pemilik)->post('/logout');
+
+        $response->assertRedirect('/login');
+        $this->assertGuest();
+        $this->get('/pemilik/dashboard')->assertRedirect('/login');
+    }
+
+    /**
+     * Logout berhasil untuk role Pengguna / Pelanggan
+     */
+    public function test_pengguna_can_logout(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+
+        $response = $this->actingAs($pengguna)->post('/logout');
+
+        $response->assertRedirect('/login');
+        $this->assertGuest();
+        $this->get('/pengguna/dashboard')->assertRedirect('/login');
+    }
+
+    /**
+     * Halaman dashboard memiliki header anti-cache agar tidak dapat diakses via Back browser setelah logout
+     */
+    public function test_authenticated_dashboard_has_no_cache_headers(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $resAdmin = $this->actingAs($admin)->get('/admin/dashboard');
+        $this->assertStringContainsString('no-store', $resAdmin->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache', $resAdmin->headers->get('Cache-Control'));
+        $resAdmin->assertHeader('Pragma', 'no-cache');
+
+        $pemilik = User::where('username', 'pemilik')->first();
+        $resPemilik = $this->actingAs($pemilik)->get('/pemilik/dashboard');
+        $this->assertStringContainsString('no-store', $resPemilik->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache', $resPemilik->headers->get('Cache-Control'));
+
+        $pengguna = User::where('username', 'pelanggan')->first();
+        $resPengguna = $this->actingAs($pengguna)->get('/pengguna/dashboard');
+        $this->assertStringContainsString('no-store', $resPengguna->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache', $resPengguna->headers->get('Cache-Control'));
     }
 
     /**
