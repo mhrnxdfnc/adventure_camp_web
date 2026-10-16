@@ -142,48 +142,10 @@
                     </td>
                 </tr>
             @endforeach
-        @elseif(isset($pesananMenunggu))
+        @else
             <tr>
                 <td colspan="7" class="text-center py-4 text-muted">
                     Tidak ada pesanan masuk yang menunggu konfirmasi saat ini.
-                </td>
-            </tr>
-        @else
-            <tr>
-                <td><strong>TRX-20261015-001</strong></td>
-                <td>Andi Pratama</td>
-                <td>16 Okt 2026 &rarr; 18 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-                <td>Tenda Dome 4P (1), Sleeping Bag (2)</td>
-                <td>Rp 200.000</td>
-                <td><x-status-badge status="Menunggu Konfirmasi" /></td>
-                <td>
-                    <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi persetujuan akan diaktifkan pada implementasi alur bisnis">
-                        Tinjau (Tahap 2)
-                    </button>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>TRX-20261014-003</strong></td>
-                <td>Siti Aulia</td>
-                <td>15 Okt 2026 &rarr; 17 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-                <td>Carrier 60L (2)</td>
-                <td>Rp 160.000</td>
-                <td><x-status-badge status="Sedang Disewa" /></td>
-                <td>
-                    <button type="button" class="btn btn-sm btn-outline-secondary disabled" title="Aksi pengembalian akan diaktifkan pada implementasi alur bisnis">
-                        Proses (Tahap 2)
-                    </button>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>TRX-20261012-002</strong></td>
-                <td>Budi Santoso</td>
-                <td>12 Okt 2026 &rarr; 14 Okt 2026 <small class="text-muted d-block">(2 hari)</small></td>
-                <td>Kompor Portable (1), Nesting (1)</td>
-                <td>Rp 70.000</td>
-                <td><x-status-badge status="Selesai" /></td>
-                <td>
-                    <span class="text-muted small">Selesai</span>
                 </td>
             </tr>
         @endif
@@ -196,7 +158,6 @@
         <div class="ac-card h-100">
             <div class="ac-card-header">
                 <h3 class="ac-card-title">Kondisi Alat Camping</h3>
-                <span class="badge bg-secondary">Status Fisik</span>
             </div>
             <div class="ac-card-body">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -204,21 +165,21 @@
                         <strong>Siap Disewa (Kondisi Baik)</strong>
                         <small class="text-muted d-block">Stok dapat dipesan pelanggan</small>
                     </div>
-                    <span class="badge bg-success" style="font-size:0.9rem;">24 Unit</span>
+                    <span class="badge bg-success" style="font-size:0.9rem;">{{ $stokKondisiBaik ?? 0 }} Unit</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
                         <strong>Perlu Perbaikan</strong>
                         <small class="text-muted d-block">Pengecekan ritsleting & frame tenda</small>
                     </div>
-                    <span class="badge bg-warning text-dark" style="font-size:0.9rem;">3 Unit</span>
+                    <span class="badge bg-warning text-dark" style="font-size:0.9rem;">{{ $stokPerluPerbaikan ?? 0 }} Unit</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <div>
                         <strong>Rusak / Afkir</strong>
                         <small class="text-muted d-block">Tidak boleh dihitung sebagai stok sewa</small>
                     </div>
-                    <span class="badge bg-danger" style="font-size:0.9rem;">1 Unit</span>
+                    <span class="badge bg-danger" style="font-size:0.9rem;">{{ $stokRusak ?? 0 }} Unit</span>
                 </div>
             </div>
         </div>
@@ -229,7 +190,6 @@
         <div class="ac-card h-100">
             <div class="ac-card-header">
                 <h3 class="ac-card-title">Pedoman Operasional Admin</h3>
-                <span class="badge bg-info text-dark">SOP</span>
             </div>
             <div class="ac-card-body">
                 <ul class="mb-0 ps-3 small text-muted" style="line-height: 1.7;">

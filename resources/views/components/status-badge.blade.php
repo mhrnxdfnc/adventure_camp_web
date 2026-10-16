@@ -1,4 +1,8 @@
-@props(['status' => '—'])
+@props([
+    'status' => '—',
+    'visualOnly' => false,
+    'showText' => true,
+])
 
 @php
     $s = trim((string) $status);
@@ -18,9 +22,13 @@
     } elseif (in_array($lower, ['belum dibayar', 'draft'])) {
         $type = 'secondary';
     }
+
+    $isVisualOnly = $visualOnly || ! $showText;
 @endphp
 
-<span {{ $attributes->merge(['class' => 'ac-badge ac-badge-' . $type]) }}>
+<span {{ $attributes->merge(['class' => 'ac-badge ac-badge-' . $type . ($isVisualOnly ? ' ac-badge-visual-only' : '')]) }} title="{{ $label }}" aria-label="{{ $label }}" data-status="{{ $s }}">
     <span class="ac-badge-dot"></span>
-    <span>{{ $label }}</span>
+    @unless($isVisualOnly)
+        <span>{{ $label }}</span>
+    @endunless
 </span>

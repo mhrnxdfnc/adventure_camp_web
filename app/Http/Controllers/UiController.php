@@ -40,6 +40,9 @@ class UiController extends Controller
         $countMenungguPembayaran = Pembayaran::where('status_pembayaran', 'Menunggu Verifikasi')->count();
         $countSedangDisewa = Penyewaan::whereIn('status_penyewaan', ['Sedang Disewa', 'Berjalan'])->count();
         $totalStokFisik = (int) Alat::sum('stok');
+        $stokKondisiBaik = (int) Alat::where('kondisi', 'Baik')->sum('stok');
+        $stokPerluPerbaikan = (int) Alat::where('kondisi', 'Perlu Perbaikan')->sum('stok');
+        $stokRusak = (int) Alat::where('kondisi', 'Rusak')->sum('stok');
 
         return view('admin.dashboard', [
             'pesananMenunggu' => $pesananMenunggu,
@@ -47,6 +50,9 @@ class UiController extends Controller
             'countMenungguPembayaran' => $countMenungguPembayaran,
             'countSedangDisewa' => $countSedangDisewa,
             'totalStokFisik' => $totalStokFisik,
+            'stokKondisiBaik' => $stokKondisiBaik,
+            'stokPerluPerbaikan' => $stokPerluPerbaikan,
+            'stokRusak' => $stokRusak,
         ]);
     }
 

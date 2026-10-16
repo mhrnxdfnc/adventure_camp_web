@@ -353,6 +353,20 @@ body {
     line-height: 1;
 }
 
+.ac-badge.ac-badge-visual-only {
+    padding: 0.35rem;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ac-badge.ac-badge-visual-only .ac-badge-dot {
+    margin: 0;
+}
+
 .ac-badge-dot {
     width: 6px;
     height: 6px;

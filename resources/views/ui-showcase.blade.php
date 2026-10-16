@@ -8,18 +8,18 @@
     <div class="d-flex align-items-center gap-3">
         <span class="fs-1">🎨</span>
         <div>
-            <h3 class="font-weight-bold mb-1">Showcase Komponen & Fondasi Antarmuka</h3>
-            <p class="mb-0 small">
-                Halaman ini memvalidasi kelengkapan komponen Blade, Bootstrap 5, responsivitas mobile/desktop, dan penanganan status sesuai ketentuan <code>CONTEXT.md</code>.
+            <h3 class="font-weight-bold mb-1">Showcase Komponen UI</h3>
+            <p class="mb-0 small text-success-emphasis">
+                Katalog elemen visual dan komponen antarmuka standar Adventure Camp Rental.
             </p>
         </div>
     </div>
 </div>
 
-<!-- 1. STATUS BADGES -->
+<!-- STATUS BADGES -->
 <div class="ac-card mb-4">
     <div class="ac-card-header">
-        <h3 class="ac-card-title">1. Komponen Status Badge (<code>&lt;x-status-badge /&gt;</code>)</h3>
+        <h3 class="ac-card-title">Status Badge</h3>
     </div>
     <div class="ac-card-body">
         <div class="row g-4">
@@ -59,10 +59,10 @@
     </div>
 </div>
 
-<!-- 2. ALERTS & VALIDATION -->
+<!-- ALERTS & VALIDATION -->
 <div class="ac-card mb-4">
     <div class="ac-card-header">
-        <h3 class="ac-card-title">2. Komponen Alert & Validasi Input Gagal</h3>
+        <h3 class="ac-card-title">Notifikasi & Validasi Input</h3>
     </div>
     <div class="ac-card-body">
         <!-- Success Alert -->
@@ -104,7 +104,7 @@
                 <svg width="20" height="20" fill="currentColor" class="flex-shrink-0" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                 </svg>
-                <strong>Validasi Gagal (422 Unprocessable Entity):</strong>
+                <strong>Validasi Gagal:</strong>
             </div>
             <ul class="mb-0 ps-4 small">
                 <li>Tanggal kembali harus berada setelah tanggal mulai sewa.</li>
@@ -115,15 +115,9 @@
     </div>
 </div>
 
-<!-- 3. DATA TABLE -->
+<!-- DATA TABLE -->
 <div class="mb-4">
-    <x-data-table title="3. Komponen Data Table (Responsive & Filterable)" subtitle="Menampilkan data dengan header pencarian, badge status, dan pagination" searchId="demoSearch">
-        <x-slot:actions>
-            <button type="button" class="btn btn-sm btn-ac-primary disabled" title="Aksi tambah data akan diaktifkan pada modul CRUD masing-masing">
-                + Tambah Data (Tahap 2)
-            </button>
-        </x-slot:actions>
-
+    <x-data-table title="Komponen Data Table" subtitle="Menampilkan data dengan header pencarian, badge status, dan pagination" searchId="demoSearch">
         <thead>
             <tr>
                 <th>Kode Alat</th>
@@ -172,10 +166,10 @@
     </x-data-table>
 </div>
 
-<!-- 4. EMPTY, LOADING, & ERROR STATES -->
+<!-- EMPTY, LOADING, & ERROR STATES -->
 <div class="row g-4">
     <div class="col-12 col-lg-4">
-        <h5 class="font-weight-bold mb-2">4. State: Data Kosong</h5>
+        <h5 class="font-weight-bold mb-2">Data Kosong</h5>
         <x-empty-state 
             title="Tidak Ada Riwayat" 
             message="Data tidak ditemukan untuk parameter pencarian yang Anda tentukan." 
@@ -184,16 +178,15 @@
     </div>
 
     <div class="col-12 col-lg-4">
-        <h5 class="font-weight-bold mb-2">5. State: Loading Skeleton</h5>
+        <h5 class="font-weight-bold mb-2">Loading Skeleton</h5>
         <x-loading-state label="Sedang mengambil data sewa..." :rows="2" />
     </div>
 
     <div class="col-12 col-lg-4">
-        <h5 class="font-weight-bold mb-2">6. State: Error Handler</h5>
+        <h5 class="font-weight-bold mb-2">Error Handler</h5>
         <x-error-state 
-            title="Gagal Terhubung ke Database" 
-            message="Koneksi terputus. Pastikan service MySQL Laragon aktif pada port 3306." 
-            code="ERR_DB_CONN" 
+            title="Terjadi Kendala Pemrosesan" 
+            message="Permintaan tidak dapat diproses saat ini. Silakan muat ulang halaman atau coba beberapa saat lagi." 
             retryUrl="{{ url('/ui-showcase') }}"
         />
     </div>

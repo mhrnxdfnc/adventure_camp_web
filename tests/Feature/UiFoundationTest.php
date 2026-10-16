@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Tests\TestCase;
 
 class UiFoundationTest extends TestCase
@@ -66,7 +67,7 @@ class UiFoundationTest extends TestCase
      */
     public function test_admin_dashboard_renders_correctly(): void
     {
-        $admin = \App\Models\User::where('username', 'admin')->first();
+        $admin = User::where('username', 'admin')->first();
         $response = $this->actingAs($admin)->get('/admin/dashboard');
 
         $response->assertStatus(200);
@@ -83,7 +84,7 @@ class UiFoundationTest extends TestCase
      */
     public function test_pengguna_dashboard_renders_correctly(): void
     {
-        $pengguna = \App\Models\User::where('username', 'pelanggan')->first();
+        $pengguna = User::where('username', 'pelanggan')->first();
         $response = $this->actingAs($pengguna)->get('/pengguna/dashboard');
 
         $response->assertStatus(200);
@@ -99,7 +100,7 @@ class UiFoundationTest extends TestCase
      */
     public function test_pemilik_dashboard_renders_strictly_read_only(): void
     {
-        $pemilik = \App\Models\User::where('username', 'pemilik')->first();
+        $pemilik = User::where('username', 'pemilik')->first();
         $response = $this->actingAs($pemilik)->get('/pemilik/dashboard');
 
         $response->assertStatus(200);
@@ -111,5 +112,27 @@ class UiFoundationTest extends TestCase
         $response->assertSee('Pendapatan Bulan Ini');
         $response->assertSee('Riwayat Pesanan Pelanggan (Pengawasan Pemilik)');
         $response->assertSee('Laporan Alat Rusak');
+    }
+
+    /**
+     * Uji antarmuka bersih dari teks teknis internal dan status badge dapat digunakan visual-only
+     */
+    public function test_ui_clean_from_internal_technical_documentation_and_status_badge_visual_only(): void
+    {
+        $response = $this->get('/ui-showcase');
+        $content = $response->getContent();
+
+        // Tidak boleh menampilkan teks dokumentasi internal atau metadata tugas
+        $this->assertStringNotContainsString('CONTEXT.md', $content);
+        $this->assertStringNotContainsString('Arsitektur Laravel Monolith', $content);
+        $this->assertStringNotContainsString('Laragon Environment', $content);
+        $this->assertStringNotContainsString('Tahap 2', $content);
+        $this->assertStringNotContainsString('(422 Unprocessable Entity)', $content);
+
+        // Uji rendering komponen visual-only status-badge
+        $renderedVisual = (string) $this->blade('<x-status-badge status="Baik" :visual-only="true" />');
+        $this->assertStringContainsString('ac-badge-visual-only', $renderedVisual);
+        $this->assertStringContainsString('title="Baik"', $renderedVisual);
+        $this->assertStringNotContainsString('<span>Baik</span>', $renderedVisual);
     }
 }

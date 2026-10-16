@@ -11,13 +11,6 @@
     </div>
 
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ url('/ui-showcase') }}" class="btn btn-sm btn-ac-outline d-none d-sm-inline-flex align-items-center gap-1">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-            </svg>
-            Showcase UI
-        </a>
-
         @auth
             <!-- User Profile Dropdown -->
             <div class="dropdown">

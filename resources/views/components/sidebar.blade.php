@@ -123,14 +123,6 @@
                 <span>Katalog Alat Camping</span>
             </a>
         @endauth
-
-        <div class="ac-menu-category">Utilitas Antarmuka</div>
-        <a href="{{ url('/ui-showcase') }}" class="ac-menu-item {{ request()->routeIs('ui.showcase') ? 'active' : '' }}">
-            <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-            </svg>
-            <span>Showcase Komponen UI</span>
-        </a>
     </nav>
 
     <!-- Sidebar Footer -->

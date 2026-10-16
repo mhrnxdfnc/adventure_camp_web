@@ -26,7 +26,6 @@
         <h4 class="mb-0 fw-bold font-monospace text-dark">{{ $penyewaan->no_transaksi }}</h4>
     </div>
     <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-secondary">Mode Read-Only</span>
         <x-status-badge :status="$penyewaan->status_penyewaan" />
         <x-status-badge :status="$penyewaan->status_pembayaran" />
     </div>
