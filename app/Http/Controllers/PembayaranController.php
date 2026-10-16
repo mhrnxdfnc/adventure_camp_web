@@ -159,11 +159,11 @@ class PembayaranController extends Controller
 
         $user = Auth::user();
 
-        // 1. Otorisasi akses berkas: Hanya Admin atau Pengguna pemilik pesanan
-        $isOwner = $user->isPengguna() && (int) $user->id_pelanggan === (int) $penyewaan->id_pelanggan;
-        $isAdmin = $user->isAdmin();
+        // 1. Otorisasi akses berkas: Admin, Pemilik (pengawasan bisnis read-only), atau Pengguna pemilik pesanan
+        $isCustomerOwner = $user->isPengguna() && (int) $user->id_pelanggan === (int) $penyewaan->id_pelanggan;
+        $isStaffOrOwner = $user->isAdmin() || $user->isPemilik();
 
-        if (! $isAdmin && ! $isOwner) {
+        if (! $isStaffOrOwner && ! $isCustomerOwner) {
             abort(Response::HTTP_FORBIDDEN, 'Anda tidak memiliki hak akses untuk melihat berkas bukti pembayaran ini.');
         }
 
