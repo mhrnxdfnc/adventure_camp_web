@@ -17,7 +17,7 @@
         $type = 'warning';
     } elseif (in_array($lower, ['disetujui', 'siap diambil', 'sedang disewa', 'diproses'])) {
         $type = 'info';
-    } elseif (in_array($lower, ['ditolak', 'dibatalkan', 'rusak', 'belum lunas', 'bermasalah', 'tidak aktif'])) {
+    } elseif (in_array($lower, ['ditolak', 'dibatalkan', 'rusak', 'belum lunas', 'bermasalah', 'tidak aktif', 'nonaktif'])) {
         $type = 'danger';
     } elseif (in_array($lower, ['belum dibayar', 'draft'])) {
         $type = 'secondary';

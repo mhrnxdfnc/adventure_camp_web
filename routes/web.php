@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminLogController;
 use App\Http\Controllers\AdminPembayaranController;
 use App\Http\Controllers\AdminPesananController;
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AlatController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventarisController;
@@ -90,6 +91,10 @@ Route::middleware(['auth', 'role:Admin'])
 
         // Audit Trail & Riwayat Log Aktivitas Sistem (Admin Only)
         Route::get('/logs', [AdminLogController::class, 'index'])->name('logs.index');
+
+        // Manajemen Pengguna (Admin Only)
+        Route::patch('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::resource('users', AdminUserController::class)->parameters(['users' => 'user'])->except(['show']);
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
