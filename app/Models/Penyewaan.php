@@ -30,6 +30,7 @@ class Penyewaan extends Model
         'tanggal_sewa',
         'tanggal_kembali',
         'status_penyewaan',
+        'sumber_pesanan',
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ class Penyewaan extends Model
             'id_user' => 'integer',
             'tanggal_sewa' => 'date',
             'tanggal_kembali' => 'date',
+            'sumber_pesanan' => 'string',
         ];
     }
 
@@ -270,5 +272,21 @@ class Penyewaan extends Model
     public function isSelesai(): bool
     {
         return $this->status_penyewaan === 'Selesai';
+    }
+
+    /**
+     * Periksa apakah pesanan dibuat melalui tablet on-site kasir
+     */
+    public function isOnsite(): bool
+    {
+        return ($this->sumber_pesanan ?? 'online') === 'on-site';
+    }
+
+    /**
+     * Periksa apakah pesanan dibuat melalui portal daring (online)
+     */
+    public function isOnline(): bool
+    {
+        return ($this->sumber_pesanan ?? 'online') !== 'on-site';
     }
 }

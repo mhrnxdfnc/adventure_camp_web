@@ -85,8 +85,24 @@
         @if(isset($pesananMenunggu) && $pesananMenunggu->isNotEmpty())
             @foreach($pesananMenunggu as $trx)
                 <tr>
-                    <td><strong>{{ $trx->no_transaksi }}</strong></td>
-                    <td>{{ $trx->pelanggan?->nama_pelanggan ?? 'Pelanggan #' . $trx->id_pelanggan }}</td>
+                    <td>
+                        <strong>{{ $trx->no_transaksi }}</strong>
+                        @if($trx->isOnsite())
+                            <span class="badge bg-warning-subtle text-dark border border-warning d-block mt-1" style="font-size:0.7rem; width:fit-content;">
+                                📟 On-Site Kasir
+                            </span>
+                        @else
+                            <span class="badge bg-info-subtle text-info border border-info d-block mt-1" style="font-size:0.7rem; width:fit-content;">
+                                🌐 Online
+                            </span>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="fw-bold">{{ $trx->pelanggan?->nama_pelanggan ?? 'Pelanggan #' . $trx->id_pelanggan }}</div>
+                        @if($trx->pelanggan?->nomor_telepon)
+                            <small class="text-muted d-block font-monospace">{{ $trx->pelanggan->nomor_telepon }}</small>
+                        @endif
+                    </td>
                     <td>
                         {{ \Carbon\Carbon::parse($trx->tanggal_sewa)->format('d M Y') }} &rarr; {{ \Carbon\Carbon::parse($trx->tanggal_kembali)->format('d M Y') }}
                         <small class="text-muted d-block">({{ $trx->durasi_hari }} hari)</small>

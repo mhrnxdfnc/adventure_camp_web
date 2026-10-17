@@ -98,6 +98,11 @@
                         <tr>
                             <td class="ps-4">
                                 <span class="fw-bold text-dark font-monospace">{{ $trx->no_transaksi }}</span>
+                                @if($trx->isOnsite())
+                                    <span class="badge bg-warning-subtle text-dark border border-warning d-block mt-1" style="font-size:0.65rem; width:fit-content;">📟 On-Site</span>
+                                @else
+                                    <span class="badge bg-info-subtle text-info border border-info d-block mt-1" style="font-size:0.65rem; width:fit-content;">🌐 Online</span>
+                                @endif
                             </td>
                             <td>
                                 <div>{{ $trx->tanggal_sewa ? \Carbon\Carbon::parse($trx->tanggal_sewa)->translatedFormat('d M Y') : '-' }}</div>

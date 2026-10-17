@@ -15,10 +15,11 @@ return new class extends Migration
             Schema::create('penyewaan', function (Blueprint $table) {
                 $table->string('no_transaksi', 20)->primary();
                 $table->unsignedInteger('id_pelanggan');
-                $table->unsignedBigInteger('id_user');
+                $table->unsignedBigInteger('id_user')->nullable();
                 $table->date('tanggal_sewa');
                 $table->date('tanggal_kembali');
                 $table->string('status_penyewaan', 50)->default('Menunggu Konfirmasi');
+                $table->string('sumber_pesanan', 20)->default('online');
             });
         }
 

@@ -161,6 +161,7 @@ class PenggunaPesananController extends Controller
                     'tanggal_sewa' => $tanggalSewa,
                     'tanggal_kembali' => $tanggalKembali,
                     'status_penyewaan' => 'Menunggu Konfirmasi',
+                    'sumber_pesanan' => 'online',
                 ]);
 
                 // Simpan seluruh rincian alat ke dalam detail_penyewaan

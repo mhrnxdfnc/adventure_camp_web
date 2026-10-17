@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventarisController;
 use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\OnsiteKioskController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PembelianInventarisController;
@@ -147,4 +148,26 @@ Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
         Route::post('/test-action', function () {
             return response()->json(['message' => 'Should not be accessible by Pemilik']);
         })->name('test-action');
+    });
+
+// Mode Pemesanan Khusus Tablet On-Site di Depan Kasir Toko
+Route::get('/tablet', function () {
+    return redirect()->route('onsite.landing');
+})->name('tablet');
+
+Route::prefix('onsite')
+    ->name('onsite.')
+    ->group(function () {
+        Route::get('/', [OnsiteKioskController::class, 'landing'])->name('landing');
+        Route::post('/mulai', [OnsiteKioskController::class, 'mulai'])->name('mulai');
+        Route::get('/katalog', [OnsiteKioskController::class, 'katalog'])->name('katalog');
+        Route::get('/katalog/{kode_alat}', [OnsiteKioskController::class, 'detailAlat'])->name('show');
+        Route::get('/keranjang', [OnsiteKioskController::class, 'keranjang'])->name('keranjang');
+        Route::post('/keranjang/tambah', [OnsiteKioskController::class, 'tambahKeranjang'])->name('keranjang.tambah');
+        Route::post('/keranjang/update', [OnsiteKioskController::class, 'updateKeranjang'])->name('keranjang.update');
+        Route::post('/keranjang/hapus', [OnsiteKioskController::class, 'hapusKeranjang'])->name('keranjang.hapus');
+        Route::post('/keranjang/kosongkan', [OnsiteKioskController::class, 'kosongkanKeranjang'])->name('keranjang.kosongkan');
+        Route::get('/checkout', [OnsiteKioskController::class, 'checkout'])->name('checkout');
+        Route::post('/checkout', [OnsiteKioskController::class, 'prosesPesanan'])->name('checkout.proses');
+        Route::get('/sukses/{no_transaksi}', [OnsiteKioskController::class, 'sukses'])->name('sukses');
     });
