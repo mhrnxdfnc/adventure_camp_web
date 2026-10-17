@@ -64,6 +64,14 @@ class KeranjangController extends Controller
      */
     public static function add(int $userId, string $kodeAlat, int $qty = 1): array
     {
+        if ($qty <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Silakan tentukan jumlah sewa alat terlebih dahulu (minimal 1 unit).',
+                'cart_count' => self::count($userId),
+            ];
+        }
+
         $alat = Alat::where('kode_alat', $kodeAlat)->first();
 
         if (! $alat) {
@@ -280,12 +288,15 @@ class KeranjangController extends Controller
     {
         $request->validate([
             'kode_alat' => ['required', 'string', 'exists:alat,kode_alat'],
-            'jumlah' => ['nullable', 'integer', 'min:1'],
+            'jumlah' => ['required', 'integer', 'min:1'],
+        ], [
+            'jumlah.required' => 'Silakan tentukan jumlah sewa alat terlebih dahulu.',
+            'jumlah.min' => 'Silakan tentukan jumlah sewa alat terlebih dahulu (minimal 1 unit).',
         ]);
 
         $userId = (int) Auth::id();
         $kodeAlat = (string) $request->input('kode_alat');
-        $jumlah = max(1, (int) $request->input('jumlah', 1));
+        $jumlah = (int) $request->input('jumlah');
 
         $result = self::add($userId, $kodeAlat, $jumlah);
 

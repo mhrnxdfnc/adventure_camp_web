@@ -44,8 +44,16 @@ class AdminPesananController extends Controller
                         throw new \DomainException("Persetujuan ditolak: Alat [{$alat->kode_alat}] {$alat->nama_alat} dalam kondisi '{$alat->kondisi}' dan tidak layak disewakan.");
                     }
 
-                    if ($alat->stok < $detail->jumlah) {
-                        throw new \DomainException("Persetujuan ditolak: Stok alat [{$alat->kode_alat}] {$alat->nama_alat} tidak mencukupi (Tersedia: {$alat->stok} unit, Diminta: {$detail->jumlah} unit).");
+                    // Periksa ketersediaan stok periode sewa (mengecualikan transaksi saat ini)
+                    $stokTersedia = Penyewaan::hitungStokTersediaPeriode(
+                        $detail->kode_alat,
+                        $trx->tanggal_sewa,
+                        $trx->tanggal_kembali,
+                        $trx->no_transaksi
+                    );
+
+                    if ($stokTersedia < $detail->jumlah) {
+                        throw new \DomainException("Persetujuan ditolak: Stok alat [{$alat->kode_alat}] {$alat->nama_alat} tidak mencukupi untuk periode sewa yang diajukan (Tersedia: {$stokTersedia} unit, Diminta: {$detail->jumlah} unit).");
                     }
                 }
 

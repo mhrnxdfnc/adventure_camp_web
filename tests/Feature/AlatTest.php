@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\KeranjangController;
 use App\Models\Alat;
-use App\Models\DetailPenyewaan;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -336,5 +336,58 @@ class AlatTest extends TestCase
 
         $response->assertForbidden();
         $this->assertDatabaseHas('alat', ['kode_alat' => 'ALT002']);
+    }
+
+    /**
+     * Pastikan kelima barang di katalog memiliki nilai awal 0,
+     * penambahan jumlah 0 atau negatif ditolak, dan penambahan positif tidak di-reset oleh katalog.
+     */
+    public function test_katalog_initial_quantity_controls_are_zero_and_cannot_be_negative(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($pengguna->id_user);
+
+        // 1. Buka katalog dan verifikasi seluruh 5 alat siap sewa memiliki kontrol awal value="0" dan min="0"
+        $katalogRes = $this->actingAs($pengguna)->get('/pengguna/katalog');
+        $katalogRes->assertStatus(200);
+
+        $daftarAlat = Alat::where('kondisi', 'Baik')->where('stok', '>', 0)->get();
+        $this->assertCount(5, $daftarAlat);
+
+        foreach ($daftarAlat as $item) {
+            // Verifikasi input jumlah memiliki nilai awal 0 dan batas bawah min="0"
+            $katalogRes->assertSee('id="qty_'.$item->kode_alat.'"', false);
+            $katalogRes->assertSee('value="0"', false);
+            $katalogRes->assertSee('min="0"', false);
+        }
+
+        // 2. Tombol + Keranjang menolak jika jumlah = 0
+        $responseNol = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => 'ALT001',
+            'jumlah' => 0,
+        ]);
+        $responseNol->assertSessionHasErrors('jumlah');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        // 3. Tombol + Keranjang menolak jika jumlah negatif
+        $responseNegatif = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => 'ALT001',
+            'jumlah' => -2,
+        ]);
+        $responseNegatif->assertSessionHasErrors('jumlah');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        // 4. Tambahkan barang jika jumlah > 0 (misal 2 unit ALT002 dengan stok 4)
+        $responsePositif = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => 'ALT002',
+            'jumlah' => 2,
+        ]);
+        $responsePositif->assertSessionHas('success');
+        $this->assertEquals(2, KeranjangController::count($pengguna->id_user));
+
+        // 5. Muat ulang katalog: Barang di keranjang TIDAK boleh ter-reset dan input katalog tetap 0
+        $reloadRes = $this->actingAs($pengguna)->get('/pengguna/katalog');
+        $reloadRes->assertStatus(200);
+        $this->assertEquals(2, KeranjangController::count($pengguna->id_user));
     }
 }

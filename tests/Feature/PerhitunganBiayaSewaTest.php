@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\KeranjangController;
 use App\Models\Alat;
 use App\Models\DetailPenyewaan;
 use App\Models\Pelanggan;
@@ -319,5 +320,176 @@ class PerhitunganBiayaSewaTest extends TestCase
         $this->assertEquals(3, $trx->durasi_hari);
         // Tetap menghasilkan 350.000 dari data pembayaran historis
         $this->assertEquals(350000.0, $trx->total_biaya);
+    }
+
+    /**
+     * Uji Rule 7: 2 tenda @ Rp50.000/hari dan 3 sleeping bag @ Rp25.000/hari selama 3 hari menghasilkan total Rp525.000
+     */
+    public function test_checkout_formula_example_rule_7_tenda_dan_sleeping_bag(): void
+    {
+        $user = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($user->id_user);
+
+        // Pastikan stok mencukupi untuk pengujian
+        $tenda = Alat::where('kode_alat', 'ALT001')->first();
+        $tenda->stok = 5;
+        $tenda->tarif_sewa = 50000.00;
+        $tenda->save();
+
+        $sleepingBag = Alat::where('kode_alat', 'ALT002')->first();
+        $sleepingBag->stok = 6;
+        $sleepingBag->tarif_sewa = 25000.00;
+        $sleepingBag->save();
+
+        // 1. Uji rumus unit model murni
+        $subtotalTenda = Penyewaan::hitungTotalBiaya(50000.00, 2, 3);
+        $subtotalSleepingBag = Penyewaan::hitungTotalBiaya(25000.00, 3, 3);
+        $this->assertEquals(300000.00, $subtotalTenda);
+        $this->assertEquals(225000.00, $subtotalSleepingBag);
+        $this->assertEquals(525000.00, $subtotalTenda + $subtotalSleepingBag);
+
+        // 2. Uji alur checkout HTTP sebenarnya
+        KeranjangController::add($user->id_user, 'ALT001', 2);
+        KeranjangController::add($user->id_user, 'ALT002', 3);
+
+        $tglSewa = Carbon::now()->addDays(5)->format('Y-m-d');
+        $tglKembali = Carbon::now()->addDays(8)->format('Y-m-d'); // 3 hari durasi
+
+        $response = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => $tglSewa,
+            'tanggal_kembali' => $tglKembali,
+            'metode_pembayaran' => 'QRIS',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('pengguna.dashboard'));
+
+        $trx = Penyewaan::with(['detailPenyewaan', 'pembayaran'])
+            ->where('id_user', $user->id_user)
+            ->latest('no_transaksi')
+            ->first();
+
+        $this->assertNotNull($trx);
+        $this->assertEquals(3, $trx->durasi_hari);
+        $this->assertCount(2, $trx->detailPenyewaan);
+
+        // Detail 1: Tenda (2 unit @ 50.000 x 3 hari = 300.000)
+        $detailTenda = $trx->detailPenyewaan->where('kode_alat', 'ALT001')->first();
+        $this->assertEquals(2, $detailTenda->jumlah);
+        $this->assertEquals(50000.00, (float) $detailTenda->tarif_sewa);
+        $this->assertEquals(300000.00, $detailTenda->subtotal_biaya);
+
+        // Detail 2: Sleeping Bag (3 unit @ 25.000 x 3 hari = 225.000)
+        $detailSb = $trx->detailPenyewaan->where('kode_alat', 'ALT002')->first();
+        $this->assertEquals(3, $detailSb->jumlah);
+        $this->assertEquals(25000.00, (float) $detailSb->tarif_sewa);
+        $this->assertEquals(225000.00, $detailSb->subtotal_biaya);
+
+        // Total transaksi = 525.000
+        $this->assertEquals(525000.00, $trx->total_biaya);
+        $this->assertEquals(525000.00, (float) $trx->pembayaran->total_biaya);
+    }
+
+    /**
+     * Uji Rule 8: Hitung ulang harga di backend dan abaikan data manipulasi dari browser
+     */
+    public function test_backend_recalculates_price_ignoring_browser_input(): void
+    {
+        $user = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($user->id_user);
+
+        $alat = Alat::where('kode_alat', 'ALT001')->first();
+        $alat->stok = 5;
+        $alat->tarif_sewa = 50000.00;
+        $alat->save();
+
+        KeranjangController::add($user->id_user, 'ALT001', 1);
+
+        $tglSewa = Carbon::now()->addDays(10)->format('Y-m-d');
+        $tglKembali = Carbon::now()->addDays(12)->format('Y-m-d'); // 2 hari
+
+        // Coba kirim data palsu total_biaya / tarif_sewa / subtotal dari browser
+        $response = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => $tglSewa,
+            'tanggal_kembali' => $tglKembali,
+            'metode_pembayaran' => 'Cash',
+            'total_biaya' => 1000,
+            'tarif_sewa' => 100,
+            'subtotal' => 200,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $trx = Penyewaan::where('id_user', $user->id_user)->latest('no_transaksi')->first();
+        $this->assertEquals(2, $trx->durasi_hari);
+        // Backend harus tetap menghitung: 50.000 x 1 x 2 = 100.000
+        $this->assertEquals(100000.00, $trx->total_biaya);
+        $this->assertEquals(100000.00, (float) $trx->pembayaran->total_biaya);
+    }
+
+    /**
+     * Uji Rule 11: Validasi ketersediaan alat berdasarkan periode sewa dan pencegahan overbooking pesanan bersamaan
+     */
+    public function test_validasi_ketersediaan_alat_berdasarkan_periode_sewa_dan_pesanan_bersamaan(): void
+    {
+        $user1 = User::where('username', 'pelanggan')->first();
+        $user2 = User::where('username', 'budi')->first();
+        $admin = User::where('role', 'Admin')->first();
+
+        // Siapkan alat dengan stok terbatas (2 unit)
+        $alat = Alat::where('kode_alat', 'ALT004')->first();
+        $alat->stok = 2;
+        $alat->save();
+
+        $tglSewa = Carbon::now()->addDays(15)->format('Y-m-d');
+        $tglKembali = Carbon::now()->addDays(18)->format('Y-m-d');
+
+        // Pesanan 1: Memesan 2 unit ALT004 untuk periode tsb
+        $res1 = $this->actingAs($user1)->post(route('pengguna.pesanan.store'), [
+            'kode_alat' => 'ALT004',
+            'jumlah' => 2,
+            'tanggal_sewa' => $tglSewa,
+            'tanggal_kembali' => $tglKembali,
+            'metode_pembayaran' => 'Cash',
+        ]);
+        $res1->assertSessionHasNoErrors();
+
+        $trx1 = Penyewaan::where('id_user', $user1->id_user)->latest('no_transaksi')->first();
+        // Admin menyetujui pesanan 1 sehingga stok teralokasi (status: Menunggu Pembayaran)
+        $this->actingAs($admin)->post(route('admin.pesanan.setujui', $trx1->no_transaksi));
+        $this->assertEquals('Menunggu Pembayaran', $trx1->fresh()->status_penyewaan);
+
+        // Pesanan 2: User lain mencoba memesan 1 unit pada periode yang beririsan (misal tgl 16 s/d 17)
+        $tglSewaIrisan = Carbon::now()->addDays(16)->format('Y-m-d');
+        $tglKembaliIrisan = Carbon::now()->addDays(17)->format('Y-m-d');
+
+        $res2 = $this->actingAs($user2)->post(route('pengguna.pesanan.store'), [
+            'kode_alat' => 'ALT004',
+            'jumlah' => 1,
+            'tanggal_sewa' => $tglSewaIrisan,
+            'tanggal_kembali' => $tglKembaliIrisan,
+            'metode_pembayaran' => 'Cash',
+        ]);
+
+        // Pesanan 2 harus ditolak karena kapasitas stok pada periode tersebut sudah penuh (tersedia 0 unit)
+        $res2->assertSessionHasErrors('jumlah');
+
+        // Pesanan 3: User mencoba memesan 2 unit pada periode yang TIDAK beririsan (misal tgl 19 s/d 21)
+        $tglSewaBeda = Carbon::now()->addDays(19)->format('Y-m-d');
+        $tglKembaliBeda = Carbon::now()->addDays(21)->format('Y-m-d');
+
+        $res3 = $this->actingAs($user2)->post(route('pengguna.pesanan.store'), [
+            'kode_alat' => 'ALT004',
+            'jumlah' => 2,
+            'tanggal_sewa' => $tglSewaBeda,
+            'tanggal_kembali' => $tglKembaliBeda,
+            'metode_pembayaran' => 'Cash',
+        ]);
+
+        // Pesanan 3 harus berhasil karena tidak beririsan
+        $res3->assertSessionHasNoErrors();
+        $trx3 = Penyewaan::where('id_user', $user2->id_user)->latest('no_transaksi')->first();
+        $this->assertNotNull($trx3);
+        $this->assertEquals(2, $trx3->detailPenyewaan->first()->jumlah);
     }
 }

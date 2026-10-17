@@ -102,6 +102,41 @@ class Penyewaan extends Model
     }
 
     /**
+     * Hitung sisa stok alat yang benar-benar tersedia untuk periode tanggal sewa tertentu.
+     * Memperhitungkan stok fisik toko dikurangi pemesanan aktif lain yang beririsan periode sewanya.
+     */
+    public static function hitungStokTersediaPeriode(
+        string $kodeAlat,
+        mixed $tanggalSewa,
+        mixed $tanggalKembali,
+        ?string $excludeNoTransaksi = null
+    ): int {
+        $alat = Alat::where('kode_alat', $kodeAlat)->first();
+        if (! $alat || $alat->kondisi !== 'Baik') {
+            return 0;
+        }
+
+        $stokFisik = (int) $alat->stok;
+
+        $sewaStr = Carbon::parse($tanggalSewa)->format('Y-m-d');
+        $kembaliStr = Carbon::parse($tanggalKembali)->format('Y-m-d');
+
+        $reserved = (int) DetailPenyewaan::where('kode_alat', $kodeAlat)
+            ->whereHas('penyewaan', function ($q) use ($sewaStr, $kembaliStr, $excludeNoTransaksi) {
+                $q->whereIn('status_penyewaan', ['Menunggu Pembayaran', 'Disetujui', 'Siap Diambil'])
+                    ->whereDate('tanggal_sewa', '<', $kembaliStr)
+                    ->whereDate('tanggal_kembali', '>', $sewaStr);
+
+                if ($excludeNoTransaksi) {
+                    $q->where('no_transaksi', '!=', $excludeNoTransaksi);
+                }
+            })
+            ->sum('jumlah');
+
+        return max(0, $stokFisik - $reserved);
+    }
+
+    /**
      * Hitung durasi sewa dalam hari (minimal 1 hari)
      */
     public function getDurasiHariAttribute(): int

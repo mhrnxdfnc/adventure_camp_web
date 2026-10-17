@@ -99,6 +99,9 @@ class PenggunaPesananController extends Controller
 
         try {
             $noTransaksi = DB::transaction(function () use ($orderItems, $tanggalSewa, $tanggalKembali, $metodePembayaran, $user, $idPelanggan) {
+                // Urutkan item berdasarkan kode_alat untuk mencegah deadlock saat penguncian baris (lockForUpdate)
+                usort($orderItems, fn ($a, $b) => strcmp($a['kode_alat'], $b['kode_alat']));
+
                 // Hitung durasi hari dari kedua tanggal
                 $durasi = Penyewaan::hitungDurasiHari($tanggalSewa, $tanggalKembali);
 
@@ -106,7 +109,7 @@ class PenggunaPesananController extends Controller
                 $grandTotal = 0.0;
                 $itemLogDescriptions = [];
 
-                // Periksa setiap alat dalam transaksi: kondisi fisik, ketersediaan stok, dan tarif resmi database
+                // Periksa setiap alat dalam transaksi: kondisi fisik, ketersediaan stok periode, dan tarif resmi database
                 foreach ($orderItems as $item) {
                     $alat = Alat::where('kode_alat', $item['kode_alat'])
                         ->lockForUpdate()
@@ -122,8 +125,14 @@ class PenggunaPesananController extends Controller
                     }
 
                     $jumlah = (int) $item['jumlah'];
-                    if ($jumlah > (int) $alat->stok) {
-                        throw new \DomainException("Stok alat {$alat->nama_alat} tidak mencukupi (tersedia: {$alat->stok} unit, diminta: {$jumlah} unit).");
+                    if ($jumlah <= 0) {
+                        throw new \DomainException("Jumlah sewa untuk alat {$alat->nama_alat} minimal 1 unit.");
+                    }
+
+                    // Validasi ketersediaan stok berdasarkan periode sewa untuk mencegah overbooking pesanan bersamaan
+                    $stokTersedia = Penyewaan::hitungStokTersediaPeriode($alat->kode_alat, $tanggalSewa, $tanggalKembali);
+                    if ($jumlah > $stokTersedia) {
+                        throw new \DomainException("Stok alat {$alat->nama_alat} tidak mencukupi untuk periode sewa yang dipilih (tersedia: {$stokTersedia} unit, diminta: {$jumlah} unit).");
                     }
 
                     $tarifResmi = (float) $alat->tarif_sewa;

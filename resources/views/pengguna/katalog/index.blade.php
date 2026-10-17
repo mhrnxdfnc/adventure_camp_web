@@ -112,9 +112,10 @@
                                                name="jumlah" 
                                                id="qty_{{ $alat->kode_alat }}" 
                                                class="form-control text-center font-weight-bold p-1" 
-                                               value="1" 
-                                               min="1" 
+                                               value="0" 
+                                               min="0" 
                                                max="{{ $alat->stok }}" 
+                                               autocomplete="off"
                                                required 
                                                onchange="validateQtyInput('{{ $alat->kode_alat }}', {{ $alat->stok }})">
                                         <button type="button" class="btn btn-outline-secondary" onclick="stepQty('{{ $alat->kode_alat }}', 1, {{ $alat->stok }})">+</button>
@@ -175,16 +176,17 @@
     function stepQty(kode, delta, max) {
         const input = document.getElementById('qty_' + kode);
         if (!input) return;
-        let val = parseInt(input.value) || 1;
-        val = Math.max(1, Math.min(max, val + delta));
+        let val = parseInt(input.value);
+        if (isNaN(val)) val = 0;
+        val = Math.max(0, Math.min(max, val + delta));
         input.value = val;
     }
 
     function validateQtyInput(kode, max) {
         const input = document.getElementById('qty_' + kode);
         if (!input) return;
-        let val = parseInt(input.value) || 1;
-        if (val < 1) val = 1;
+        let val = parseInt(input.value);
+        if (isNaN(val) || val < 0) val = 0;
         if (val > max) val = max;
         input.value = val;
     }
@@ -197,6 +199,30 @@
         document.querySelectorAll('.form-add-to-cart').forEach(form => {
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
+
+                const qtyInput = form.querySelector('input[name="jumlah"]');
+                const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+
+                // Validasi bahwa jumlah harus lebih dari 0
+                if (qty <= 0) {
+                    const pesanPeringatan = 'Silakan tentukan jumlah sewa alat terlebih dahulu (minimal 1 unit).';
+                    if (toast && toastEl) {
+                        toastEl.className = 'toast align-items-center text-bg-warning border-0 shadow-lg';
+                        const iconSpan = toastEl.querySelector('.toast-body span.fs-5');
+                        if (iconSpan) iconSpan.textContent = '⚠️';
+                        document.getElementById('toastMessage').textContent = pesanPeringatan;
+                        toast.show();
+                    } else {
+                        alert(pesanPeringatan);
+                    }
+                    if (qtyInput) {
+                        qtyInput.focus();
+                        qtyInput.classList.add('is-invalid');
+                        setTimeout(() => qtyInput.classList.remove('is-invalid'), 2000);
+                    }
+                    return;
+                }
+
                 const btn = form.querySelector('.btn-cart-submit');
                 const origHtml = btn.innerHTML;
                 btn.disabled = true;
@@ -235,12 +261,22 @@
                             btn.innerHTML = origHtml;
                         }, 1200);
 
-                        if (toast) {
+                        // Reset input kembali ke 0 setelah berhasil dimasukkan ke keranjang
+                        if (qtyInput) {
+                            qtyInput.value = 0;
+                        }
+
+                        if (toast && toastEl) {
+                            toastEl.className = 'toast align-items-center text-bg-success border-0 shadow-lg';
+                            const iconSpan = toastEl.querySelector('.toast-body span.fs-5');
+                            if (iconSpan) iconSpan.textContent = '🛒';
                             document.getElementById('toastMessage').textContent = result.data.message;
                             toast.show();
                         }
                     } else {
-                        alert(result.data.message || 'Gagal menambahkan alat ke keranjang.');
+                        const errMsg = (result.data && (result.data.message || (result.data.errors && Object.values(result.data.errors).flat()[0])))
+                            || 'Gagal menambahkan alat ke keranjang.';
+                        alert(errMsg);
                     }
                 })
                 .catch(err => {
