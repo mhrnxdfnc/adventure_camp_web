@@ -101,17 +101,24 @@
                     @endforeach
                 </div>
 
+                <div class="alert alert-light border small text-muted text-center mb-3">
+                    🔒 Demi keamanan dan privasi Anda, akses transaksi ini akan otomatis ditutup dan dibersihkan dari tablet setelah Anda menekan tombol di bawah.
+                </div>
+
                 <!-- Tombol Aksi Selesai / Pesan Baru -->
                 <div class="d-grid gap-2">
-                    <form action="{{ route('onsite.mulai') }}" method="POST">
+                    <form action="{{ route('onsite.selesai') }}" method="POST">
                         @csrf
                         <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold py-3 kiosk-btn-touch shadow-sm">
                             <span>✨ Selesai / Pesanan Baru</span>
                         </button>
                     </form>
-                    <a href="{{ route('onsite.landing') }}" class="btn btn-outline-secondary py-2 kiosk-btn-touch">
-                        Kembali ke Halaman Awal
-                    </a>
+                    <form action="{{ route('onsite.batal') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-secondary w-100 py-2 kiosk-btn-touch">
+                            Kembali ke Halaman Awal
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

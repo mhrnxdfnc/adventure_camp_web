@@ -115,7 +115,7 @@
                         </span>
                     </a>
 
-                    <form action="{{ route('onsite.mulai') }}" method="POST" class="d-inline" onsubmit="return confirm('Mulai ulang pesanan? Seluruh pilihan alat di keranjang tablet saat ini akan di-reset.');">
+                    <form action="{{ route('onsite.batal') }}" method="POST" class="d-inline" onsubmit="return confirm('Batalkan pesanan saat ini? Seluruh pilihan alat di keranjang dan data sementara akan dibersihkan.');">
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-danger text-light border-danger-subtle d-inline-flex align-items-center gap-1" title="Batalkan & Reset Kiosk">
                             <span>🔄 Batal / Baru</span>
@@ -179,6 +179,21 @@
     <!-- Bootstrap 5 Bundle JS -->
     <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     
+    <script>
+        // Pastikan tidak ada data sensitif yang tersisa di penyimpanan browser tablet bersama
+        try {
+            sessionStorage.clear();
+            localStorage.removeItem('onsite_customer_draft');
+        } catch(e) {}
+
+        // Cegah tampilan usang dari bfcache jika tombol Back ditekan pada tablet
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+
     @stack('scripts')
 </body>
 </html>

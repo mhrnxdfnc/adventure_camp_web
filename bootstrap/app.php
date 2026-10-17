@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureOnsiteKioskSession;
 use App\Http\Middleware\EnsurePemilikReadOnly;
 use App\Http\Middleware\EnsureRole;
 use Illuminate\Database\QueryException;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureRole::class,
             'pemilik.readonly' => EnsurePemilikReadOnly::class,
+            'onsite.kiosk' => EnsureOnsiteKioskSession::class,
         ]);
         $middleware->appendToGroup('web', [
             EnsurePemilikReadOnly::class,

@@ -157,9 +157,15 @@ Route::get('/tablet', function () {
 
 Route::prefix('onsite')
     ->name('onsite.')
+    ->middleware('onsite.kiosk')
     ->group(function () {
         Route::get('/', [OnsiteKioskController::class, 'landing'])->name('landing');
         Route::post('/mulai', [OnsiteKioskController::class, 'mulai'])->name('mulai');
+        Route::post('/batal', [OnsiteKioskController::class, 'batal'])->name('batal');
+        Route::post('/reset', [OnsiteKioskController::class, 'batal'])->name('reset');
+        Route::post('/selesai', [OnsiteKioskController::class, 'selesai'])->name('selesai');
+        Route::post('/cek-pelanggan', [OnsiteKioskController::class, 'cekPelanggan'])->name('cek-pelanggan');
+
         Route::get('/katalog', [OnsiteKioskController::class, 'katalog'])->name('katalog');
         Route::get('/katalog/{kode_alat}', [OnsiteKioskController::class, 'detailAlat'])->name('show');
         Route::get('/keranjang', [OnsiteKioskController::class, 'keranjang'])->name('keranjang');

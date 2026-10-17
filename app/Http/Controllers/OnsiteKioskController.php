@@ -52,6 +52,21 @@ class OnsiteKioskController extends Controller
     }
 
     /**
+     * Bersihkan seluruh sesi dan data sementara mode on-site serta regenerasi ID sesi
+     */
+    public static function clearAllSession(Request $request): void
+    {
+        self::clearCart();
+        $request->session()->forget([
+            self::SESSION_CART_KEY,
+            'onsite_customer_draft',
+            'onsite_last_completed_trx',
+        ]);
+        $request->session()->regenerate();
+        $request->session()->put('onsite_last_activity', time());
+    }
+
+    /**
      * Dapatkan rincian item keranjang on-site disinkronkan dengan data database terbaru
      *
      * @return array{items: array, total_units: int, total_subtotal_per_hari: float}
@@ -142,14 +157,79 @@ class OnsiteKioskController extends Controller
     }
 
     /**
-     * Memulai alur pesanan on-site baru
+     * Memulai alur pesanan on-site baru dengan sesi yang bersih
      */
-    public function mulai(): RedirectResponse
+    public function mulai(Request $request): RedirectResponse
     {
-        // Kosongkan keranjang sebelumnya untuk sesi pelanggan baru
-        self::clearCart();
+        self::clearAllSession($request);
 
         return redirect()->route('onsite.katalog');
+    }
+
+    /**
+     * Batalkan alur pemesanan dan bersihkan seluruh data sesi sementara
+     */
+    public function batal(Request $request): RedirectResponse
+    {
+        self::clearAllSession($request);
+
+        return redirect()->route('onsite.landing')->with('info', 'Sesi pemesanan telah dibatalkan dan seluruh data sementara telah dibersihkan.');
+    }
+
+    /**
+     * Selesaikan pemesanan on-site setelah melihat konfirmasi nota dan bersihkan akses transaksi
+     */
+    public function selesai(Request $request): RedirectResponse
+    {
+        self::clearAllSession($request);
+
+        return redirect()->route('onsite.landing')->with('success', 'Sesi pemesanan telah selesai. Terima kasih telah memesan di Adventure Camp Rental.');
+    }
+
+    /**
+     * Endpoint pencarian dan validasi identitas pelanggan terdaftar secara aman
+     */
+    public function cekPelanggan(Request $request): JsonResponse
+    {
+        $request->validate([
+            'nomor_telepon' => ['required', 'string', 'min:8', 'max:20'],
+            'nama_lengkap' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $rawPhone = trim((string) $request->input('nomor_telepon'));
+        $cleanPhone = Pelanggan::normalizePhoneNumber($rawPhone);
+        $pelanggan = Pelanggan::findByPhone($cleanPhone);
+
+        if (! $pelanggan) {
+            return response()->json([
+                'registered' => false,
+                'message' => 'Nomor baru belum terdaftar. Anda akan didaftarkan sebagai pelanggan baru.',
+            ]);
+        }
+
+        $inputName = trim((string) $request->input('nama_lengkap'));
+        $maskedName = Pelanggan::maskName($pelanggan->nama_pelanggan);
+
+        if ($inputName !== '') {
+            $isMatch = Pelanggan::isNameMatch($pelanggan->nama_pelanggan, $inputName);
+
+            return response()->json([
+                'registered' => true,
+                'matched' => $isMatch,
+                'masked_name' => $maskedName,
+                'alamat' => $isMatch ? $pelanggan->alamat : null,
+                'message' => $isMatch
+                    ? 'Identitas pelanggan terdaftar terverifikasi cocok.'
+                    : "Nomor terdaftar atas nama {$maskedName}. Mohon periksa kembali nomor Anda atau konfirmasi penggunaan nomor bersama.",
+            ]);
+        }
+
+        return response()->json([
+            'registered' => true,
+            'matched' => null,
+            'masked_name' => $maskedName,
+            'message' => "Nomor telepon terdaftar atas nama {$maskedName}.",
+        ]);
     }
 
     /**
@@ -383,17 +463,22 @@ class OnsiteKioskController extends Controller
     {
         // Validasi identitas pelanggan on-site, periode sewa, dan metode pembayaran
         $request->validate([
-            'nama_lengkap' => ['required', 'string', 'max:100'],
-            'nomor_telepon' => ['required', 'string', 'min:8', 'max:20'],
-            'alamat' => ['required', 'string', 'max:255'],
+            'nama_lengkap' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[\pL\s\.\'\-]+$/u'],
+            'nomor_telepon' => ['required', 'string', 'min:8', 'max:20', 'regex:/^[0-9\+\-\s\(\)]+$/'],
+            'alamat' => ['required', 'string', 'min:5', 'max:255'],
             'tanggal_sewa' => ['required', 'date', 'after_or_equal:today'],
             'tanggal_kembali' => ['required', 'date', 'after:tanggal_sewa'],
             'metode_pembayaran' => ['required', 'in:Cash,QRIS,Transfer Bank'],
+            'konfirmasi_identitas_bersama' => ['nullable', 'boolean'],
         ], [
             'nama_lengkap.required' => 'Nama lengkap pemesan wajib diisi.',
+            'nama_lengkap.min' => 'Nama lengkap minimal 3 karakter.',
+            'nama_lengkap.regex' => 'Nama lengkap hanya boleh mengandung huruf, spasi, titik, atau tanda hubung.',
             'nomor_telepon.required' => 'Nomor telepon / WhatsApp wajib diisi.',
             'nomor_telepon.min' => 'Nomor telepon minimal 8 digit.',
+            'nomor_telepon.regex' => 'Format nomor telepon tidak valid.',
             'alamat.required' => 'Alamat tempat tinggal / asal wajib diisi.',
+            'alamat.min' => 'Alamat minimal 5 karakter.',
             'tanggal_sewa.required' => 'Tanggal mulai sewa wajib diisi.',
             'tanggal_sewa.after_or_equal' => 'Tanggal mulai sewa harus hari ini atau setelahnya.',
             'tanggal_kembali.required' => 'Tanggal pengembalian wajib diisi.',
@@ -414,22 +499,36 @@ class OnsiteKioskController extends Controller
         $namaLengkap = trim($request->input('nama_lengkap'));
         $nomorTelepon = trim($request->input('nomor_telepon'));
         $alamat = trim($request->input('alamat'));
+        $isConfirmed = $request->boolean('konfirmasi_identitas_bersama');
 
         try {
-            $noTransaksi = DB::transaction(function () use ($cartDetails, $tanggalSewa, $tanggalKembali, $metodePembayaran, $namaLengkap, $nomorTelepon, $alamat) {
-                // 1. Registrasi / Sinkronisasi data Pelanggan toko
-                $pelanggan = Pelanggan::where('nomor_telepon', $nomorTelepon)->first();
-                if (! $pelanggan) {
+            $noTransaksi = DB::transaction(function () use ($request, $cartDetails, $tanggalSewa, $tanggalKembali, $metodePembayaran, $namaLengkap, $nomorTelepon, $alamat, $isConfirmed) {
+                // 1. Registrasi / Pencocokan data Pelanggan toko yang aman
+                $cleanPhone = Pelanggan::normalizePhoneNumber($nomorTelepon);
+                $pelanggan = Pelanggan::findByPhone($cleanPhone);
+
+                if ($pelanggan) {
+                    $isMatch = Pelanggan::isNameMatch($pelanggan->nama_pelanggan, $namaLengkap);
+
+                    if ($isMatch) {
+                        // Pelanggan terdaftar yang sama: perbarui alamat jika diperlukan
+                        if (! empty($alamat) && $pelanggan->alamat !== $alamat) {
+                            $pelanggan->alamat = $alamat;
+                            $pelanggan->save();
+                        }
+                    } elseif (! $isConfirmed) {
+                        $masked = Pelanggan::maskName($pelanggan->nama_pelanggan);
+                        throw new \DomainException("Nomor telepon {$nomorTelepon} sudah terdaftar atas nama pelanggan lain (\"{$masked}\"). Mohon periksa kembali nomor telepon Anda atau centang konfirmasi penggunaan nomor bersama jika Anda menggunakan nomor kontak ini atas persetujuan pemiliknya.");
+                    }
+                    // Jika terkonfirmasi bersama, transaksi dihubungkan ke id_pelanggan terdaftar tanpa menimpa nama asli pelanggan
+                } else {
+                    // Pelanggan baru: buat entitas baru (jangan pernah menggabungkan dua pelanggan hanya berdasarkan nama)
                     $pelanggan = Pelanggan::create([
                         'nama_pelanggan' => $namaLengkap,
-                        'nomor_telepon' => $nomorTelepon,
+                        'nomor_telepon' => $cleanPhone ?: $nomorTelepon,
                         'alamat' => $alamat,
                         'created_at' => now(),
                     ]);
-                } else {
-                    $pelanggan->nama_pelanggan = $namaLengkap;
-                    $pelanggan->alamat = $alamat;
-                    $pelanggan->save();
                 }
 
                 $items = $cartDetails['items'];
@@ -513,10 +612,14 @@ class OnsiteKioskController extends Controller
                     'status_pembayaran' => 'Belum Dibayar',
                 ]);
 
-                // 6. Kosongkan keranjang on-site
+                // 6. Kosongkan keranjang on-site dan bersihkan data draft sesi
                 self::clearCart();
+                $request->session()->forget('onsite_customer_draft');
 
-                // 7. Catat audit trail
+                // 7. Simpan token otorisasi akses transaksi untuk sesi ini
+                $request->session()->put('onsite_last_completed_trx', $noTrx);
+
+                // 8. Catat audit trail
                 $summaryItems = implode(', ', $itemLogDescriptions);
                 ActivityLog::record(
                     null,
@@ -528,17 +631,24 @@ class OnsiteKioskController extends Controller
                 return $noTrx;
             });
         } catch (\DomainException $e) {
-            return back()->withErrors(['stok' => $e->getMessage()])->withInput();
+            return back()->withErrors(['identitas' => $e->getMessage()])->withInput();
         }
 
         return redirect()->route('onsite.sukses', $noTransaksi);
     }
 
     /**
-     * 7. Halaman Sukses Pemesanan Tablet On-Site
+     * 7. Halaman Sukses Pemesanan Tablet On-Site (Dilindungi dari IDOR)
      */
-    public function sukses(string $no_transaksi): View
+    public function sukses(Request $request, string $no_transaksi): View|RedirectResponse
     {
+        $authorizedTrx = $request->session()->get('onsite_last_completed_trx');
+
+        // Cegah IDOR: Pastikan pengunjung tablet hanya dapat melihat transaksi yang baru saja mereka selesaikan
+        if (! $authorizedTrx || $authorizedTrx !== $no_transaksi) {
+            return redirect()->route('onsite.landing')->with('error', 'Akses ditolak: Anda tidak memiliki izin untuk melihat rincian transaksi ini.');
+        }
+
         $penyewaan = Penyewaan::with(['pelanggan', 'detailPenyewaan.alat', 'pembayaran'])
             ->where('no_transaksi', $no_transaksi)
             ->firstOrFail();

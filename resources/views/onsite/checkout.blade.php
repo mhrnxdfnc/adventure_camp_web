@@ -66,13 +66,41 @@
 
             <!-- Kartu 2: Identitas Pemesan On-Site (Wajib) -->
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-4">
-                <div class="card-header bg-light border-0 py-3 px-4">
+                <div class="card-header bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center">
                     <h3 class="h6 fw-bold mb-0 text-dark">👤 2. Identitas Pelanggan Toko (Wajib)</h3>
+                    <span class="badge bg-success-subtle text-success small">Tamu Kasir (Tanpa Akun)</span>
                 </div>
                 <div class="card-body p-4">
                     <p class="text-muted small mb-3">
-                        Sebagai pelanggan on-site, Anda tidak perlu memiliki akun login. Cukup lengkapi data kontak di bawah ini untuk pencatatan nota dan verifikasi kasir.
+                        Sebagai pelanggan di toko, Anda tidak perlu memiliki akun login. Lengkapi data kontak untuk pencatatan nota resmi dan serah terima alat.
                     </p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">
+                            Nomor WhatsApp / Telepon Aktif <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="tel" 
+                                   name="nomor_telepon" 
+                                   id="nomorTelepon" 
+                                   class="form-control py-2 rounded-start-3 font-monospace" 
+                                   value="{{ old('nomor_telepon') }}" 
+                                   placeholder="Contoh: 081234567890" 
+                                   required 
+                                   autocomplete="off"
+                                   maxlength="20"
+                                   onblur="cekNomorPelanggan()">
+                            <button type="button" class="btn btn-outline-secondary px-3" onclick="cekNomorPelanggan()">
+                                🔍 Cek Data
+                            </button>
+                        </div>
+                        @error('nomor_telepon')
+                            <small class="text-danger d-block mt-1">{{ $message }}</small>
+                        @enderror
+
+                        <!-- Feedback Pencarian Data Pelanggan -->
+                        <div id="phoneCheckFeedback" class="mt-2 small d-none"></div>
+                    </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">
@@ -85,30 +113,15 @@
                                value="{{ old('nama_lengkap') }}" 
                                placeholder="Contoh: Budi Santoso" 
                                required 
-                               maxlength="100">
+                               autocomplete="off"
+                               maxlength="100"
+                               oninput="onNamaInputChanged()">
                         @error('nama_lengkap')
                             <small class="text-danger d-block mt-1">{{ $message }}</small>
                         @enderror
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold small">
-                            Nomor WhatsApp / Telepon Aktif <span class="text-danger">*</span>
-                        </label>
-                        <input type="tel" 
-                               name="nomor_telepon" 
-                               id="nomorTelepon" 
-                               class="form-control py-2 rounded-3" 
-                               value="{{ old('nomor_telepon') }}" 
-                               placeholder="Contoh: 08123456789" 
-                               required 
-                               maxlength="20">
-                        @error('nomor_telepon')
-                            <small class="text-danger d-block mt-1">{{ $message }}</small>
-                        @enderror
-                    </div>
-
-                    <div class="mb-0">
                         <label class="form-label fw-bold small">
                             Alamat Tempat Tinggal / Domisili <span class="text-danger">*</span>
                         </label>
@@ -118,11 +131,31 @@
                                   rows="2" 
                                   placeholder="Contoh: Jl. Merbabu No. 12, Klojen, Malang" 
                                   required 
+                                  autocomplete="off"
                                   maxlength="255">{{ old('alamat') }}</textarea>
                         @error('alamat')
                             <small class="text-danger d-block mt-1">{{ $message }}</small>
                         @enderror
                     </div>
+
+                    <!-- Kotak Konfirmasi Nomor Bersama (Muncul jika nomor terdaftar atas nama berbeda) -->
+                    <div id="boxKonfirmasiBersama" class="p-3 bg-warning-subtle border border-warning rounded-3 mb-2 d-none">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="konfirmasi_identitas_bersama" value="1" id="checkKonfirmasiBersama" {{ old('konfirmasi_identitas_bersama') ? 'checked' : '' }}>
+                            <label class="form-check-label small text-dark fw-semibold" for="checkKonfirmasiBersama">
+                                Saya mengonfirmasi bahwa saya menyewa atas izin atau bersama pemilik nomor telepon terdaftar ini.
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                            Centang jika Anda memesan menggunakan kontak keluarga/rekan kerja terdaftar.
+                        </small>
+                    </div>
+
+                    @error('identitas')
+                        <div class="alert alert-danger py-2 px-3 small border-0 rounded-3 mt-2">
+                            ⚠️ {{ $message }}
+                        </div>
+                    @enderror
                 </div>
             </div>
 
@@ -317,14 +350,85 @@
             }
         });
 
-        const labelGrandTotal = document.getElementById('labelTotalTransaksi');
-        if (labelGrandTotal) {
-            labelGrandTotal.textContent = formatRupiah(grandTotal);
+    let registeredCustomerInfo = null;
+
+    function cekNomorPelanggan() {
+        const phoneInput = document.getElementById('nomorTelepon');
+        const namaInput = document.getElementById('namaLengkap');
+        const alamatInput = document.getElementById('alamatPemesan');
+        const feedbackEl = document.getElementById('phoneCheckFeedback');
+        const boxKonfirmasi = document.getElementById('boxKonfirmasiBersama');
+
+        if (!phoneInput) return;
+        const phone = phoneInput.value.trim();
+        if (phone.length < 8) {
+            if (feedbackEl) feedbackEl.className = 'd-none';
+            if (boxKonfirmasi) boxKonfirmasi.classList.add('d-none');
+            return;
+        }
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        fetch('{{ route('onsite.cek-pelanggan') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                nomor_telepon: phone,
+                nama_lengkap: namaInput ? namaInput.value.trim() : ''
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!feedbackEl) return;
+            feedbackEl.classList.remove('d-none');
+
+            if (!data.registered) {
+                feedbackEl.className = 'mt-2 small text-success';
+                feedbackEl.innerHTML = '✨ ' + data.message;
+                if (boxKonfirmasi) boxKonfirmasi.classList.add('d-none');
+                registeredCustomerInfo = null;
+            } else {
+                registeredCustomerInfo = data;
+                if (data.matched === true) {
+                    feedbackEl.className = 'mt-2 small text-success fw-semibold';
+                    feedbackEl.innerHTML = '✅ Terverifikasi: Pelanggan terdaftar (' + data.masked_name + ')';
+                    if (data.alamat && alamatInput && !alamatInput.value.trim()) {
+                        alamatInput.value = data.alamat;
+                    }
+                    if (boxKonfirmasi) boxKonfirmasi.classList.add('d-none');
+                } else if (data.matched === false) {
+                    feedbackEl.className = 'mt-2 small text-warning fw-semibold';
+                    feedbackEl.innerHTML = '⚠️ Nomor terdaftar atas nama: <strong>' + data.masked_name + '</strong> (berbeda dengan nama yang Anda masukkan)';
+                    if (boxKonfirmasi) boxKonfirmasi.classList.remove('d-none');
+                } else {
+                    feedbackEl.className = 'mt-2 small text-info';
+                    feedbackEl.innerHTML = 'ℹ️ Nomor terdaftar atas nama: <strong>' + data.masked_name + '</strong>. Masukkan nama lengkap Anda untuk verifikasi.';
+                    if (boxKonfirmasi) boxKonfirmasi.classList.add('d-none');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Phone check error:', err);
+        });
+    }
+
+    function onNamaInputChanged() {
+        if (registeredCustomerInfo && registeredCustomerInfo.registered) {
+            cekNomorPelanggan();
         }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         hitungSemuaBiaya();
+        const phoneInput = document.getElementById('nomorTelepon');
+        if (phoneInput && phoneInput.value.trim().length >= 8) {
+            cekNomorPelanggan();
+        }
     });
 </script>
 @endpush
