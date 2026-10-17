@@ -90,6 +90,7 @@ Route::middleware(['auth', 'role:Admin'])
 
         Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
         Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
+        Route::post('/inventaris/{kode_alat}/konfirmasi-perbaikan', [InventarisController::class, 'konfirmasiPerbaikan'])->name('inventaris.konfirmasi-perbaikan');
 
         // Audit Trail & Riwayat Log Aktivitas Sistem (Admin Only)
         Route::get('/logs', [AdminLogController::class, 'index'])->name('logs.index');

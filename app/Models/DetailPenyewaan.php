@@ -24,6 +24,7 @@ class DetailPenyewaan extends Model
         'jumlah_diserahkan',
         'jumlah_kembali_baik',
         'jumlah_perlu_perbaikan',
+        'jumlah_diperbaiki',
         'jumlah_rusak',
     ];
 
@@ -35,8 +36,17 @@ class DetailPenyewaan extends Model
             'jumlah_diserahkan' => 'integer',
             'jumlah_kembali_baik' => 'integer',
             'jumlah_perlu_perbaikan' => 'integer',
+            'jumlah_diperbaiki' => 'integer',
             'jumlah_rusak' => 'integer',
         ];
+    }
+
+    /**
+     * Hitung sisa unit yang masih menunggu perbaikan untuk item transaksi ini
+     */
+    public function getJumlahMenungguPerbaikanAttribute(): int
+    {
+        return max(0, (int) $this->jumlah_perlu_perbaikan - (int) ($this->jumlah_diperbaiki ?? 0));
     }
 
     /**

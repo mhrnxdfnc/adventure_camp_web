@@ -336,7 +336,42 @@
     </tbody>
 </x-data-table>
 
-<!-- Daftar Alat Rusak / Perlu Perbaikan (Read-Only) -->
+<!-- Ringkasan & Daftar Kondisi Alat (Read-Only) -->
+@if(isset($ringkasanInventaris))
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white border rounded shadow-sm">
+                <small class="text-muted d-block">📦 Total Stok Fisik</small>
+                <strong class="fs-5 text-dark font-monospace">{{ $ringkasanInventaris['total_stok_fisik'] }} Unit</strong>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="p-3 bg-white border rounded shadow-sm">
+                <small class="text-muted d-block">✅ Stok Siap Sewa</small>
+                <strong class="fs-5 text-success font-monospace">{{ $ringkasanInventaris['stok_siap_sewa'] }} Unit</strong>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="p-3 bg-white border rounded shadow-sm">
+                <small class="text-muted d-block">🏕️ Sedang Disewa</small>
+                <strong class="fs-5 text-warning font-monospace">{{ $ringkasanInventaris['stok_sedang_disewa'] }} Unit</strong>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="p-3 bg-white border rounded shadow-sm">
+                <small class="text-muted d-block">🔧 Perlu Perbaikan</small>
+                <strong class="fs-5 text-warning font-monospace">{{ $ringkasanInventaris['stok_perlu_perbaikan'] }} Unit</strong>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="p-3 bg-white border rounded shadow-sm">
+                <small class="text-muted d-block">⚠️ Rusak / Afkir</small>
+                <strong class="fs-5 text-danger font-monospace">{{ $ringkasanInventaris['stok_rusak'] }} Unit</strong>
+            </div>
+        </div>
+    </div>
+@endif
+
 <div class="row g-3">
     <div class="col-12 col-lg-6">
         <div class="ac-card h-100">
@@ -353,7 +388,7 @@
                                 <th>Nama Alat</th>
                                 <th>Kategori</th>
                                 <th>Kondisi</th>
-                                <th>Stok Fisik</th>
+                                <th class="text-end">Jumlah Rusak</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -363,7 +398,7 @@
                                     <td>{{ $alat->nama_alat }}</td>
                                     <td><span class="badge bg-light text-dark border">{{ $alat->kategori }}</span></td>
                                     <td><x-status-badge status="Rusak" /></td>
-                                    <td>{{ $alat->stok }} unit</td>
+                                    <td class="text-end fw-bold text-danger font-monospace">{{ $alat->total_unit_rusak ?? $alat->stok }} unit</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -394,7 +429,7 @@
                                 <th>Nama Alat</th>
                                 <th>Kategori</th>
                                 <th>Kondisi</th>
-                                <th>Stok Fisik</th>
+                                <th class="text-end">Jumlah Perbaikan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -404,7 +439,7 @@
                                     <td>{{ $alat->nama_alat }}</td>
                                     <td><span class="badge bg-light text-dark border">{{ $alat->kategori }}</span></td>
                                     <td><x-status-badge status="Perlu Perbaikan" /></td>
-                                    <td>{{ $alat->stok }} unit</td>
+                                    <td class="text-end fw-bold text-warning font-monospace">{{ $alat->total_unit_perbaikan ?? $alat->stok }} unit</td>
                                 </tr>
                             @empty
                                 <tr>

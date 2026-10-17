@@ -41,17 +41,17 @@
 
 <!-- Baris Metrik Stok Alat Ini -->
 <div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <div class="ac-stat-card">
             <div class="ac-stat-head">
                 <span class="ac-stat-label">Stok Fisik Total</span>
                 <div class="ac-stat-icon-wrap" style="background-color: #e0f2fe; color: #0369a1;">📦</div>
             </div>
             <div class="ac-stat-value font-monospace">{{ $stokFisikTotal }}</div>
-            <div class="ac-stat-sub">Store + Disewa</div>
+            <div class="ac-stat-sub">Semua unit alat ini</div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <div class="ac-stat-card">
             <div class="ac-stat-head">
                 <span class="ac-stat-label">Stok di Store</span>
@@ -61,7 +61,7 @@
             <div class="ac-stat-sub">Fisik di rak toko</div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <div class="ac-stat-card">
             <div class="ac-stat-head">
                 <span class="ac-stat-label">Stok Siap Sewa</span>
@@ -77,7 +77,7 @@
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <div class="ac-stat-card">
             <div class="ac-stat-head">
                 <span class="ac-stat-label">Sedang Disewa</span>
@@ -85,6 +85,26 @@
             </div>
             <div class="ac-stat-value text-warning font-monospace">{{ $stokDialokasikan }}</div>
             <div class="ac-stat-sub">Di tangan pelanggan</div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="ac-stat-card">
+            <div class="ac-stat-head">
+                <span class="ac-stat-label">Perlu Servis</span>
+                <div class="ac-stat-icon-wrap" style="background-color: #fffbeb; color: #d97706;">🔧</div>
+            </div>
+            <div class="ac-stat-value text-warning font-monospace">{{ $stokPerluPerbaikan }}</div>
+            <div class="ac-stat-sub">Menunggu perbaikan</div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="ac-stat-card">
+            <div class="ac-stat-head">
+                <span class="ac-stat-label">Rusak / Afkir</span>
+                <div class="ac-stat-icon-wrap" style="background-color: #fee2e2; color: #b91c1c;">⚠️</div>
+            </div>
+            <div class="ac-stat-value text-danger font-monospace">{{ $stokRusak }}</div>
+            <div class="ac-stat-sub">Tidak disewakan</div>
         </div>
     </div>
 </div>
@@ -177,6 +197,92 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Section Unit Menunggu Konfirmasi Selesai Perbaikan -->
+        <div class="ac-card mb-4 border-warning">
+            <div class="ac-card-header bg-warning-subtle d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="ac-card-title text-dark fs-6 fw-bold mb-0">🔧 Unit Menunggu Konfirmasi Selesai Perbaikan</h3>
+                    <small class="text-muted">Unit kembali tersedia di stok siap sewa setelah dikonfirmasi oleh petugas yang berwenang</small>
+                </div>
+                <span class="badge bg-warning text-dark font-monospace">{{ $stokPerluPerbaikan }} unit</span>
+            </div>
+            <div class="ac-card-body p-3">
+                @if($alat->kondisi === 'Perlu Perbaikan')
+                    <div class="alert alert-warning d-flex justify-content-between align-items-center p-3 mb-3">
+                        <div>
+                            <strong>Master alat berstatus Perlu Perbaikan</strong>
+                            <small class="d-block text-muted">Semua stok toko ({{ $alat->stok }} unit) saat ini tidak siap sewa.</small>
+                        </div>
+                        <form action="{{ route('admin.inventaris.konfirmasi-perbaikan', $alat->kode_alat) }}" method="POST" onsubmit="if (this.submitted) return false; this.submitted = true;">
+                            @csrf
+                            <input type="hidden" name="jumlah" value="1">
+                            <input type="hidden" name="catatan" value="Konfirmasi perbaikan kondisi fisik master alat selesai">
+                            <button type="submit" class="btn btn-sm btn-success font-weight-bold">
+                                ✓ Konfirmasi Master Selesai (Ubah ke Baik)
+                            </button>
+                        </form>
+                    </div>
+                @endif
+
+                @if($unitPerbaikanList->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>No. Transaksi</th>
+                                    <th>Pelanggan</th>
+                                    <th class="text-center">Perlu Servis</th>
+                                    <th class="text-center">Selesai Diperbaiki</th>
+                                    <th class="text-center">Sisa Menunggu</th>
+                                    <th class="text-end">Aksi Konfirmasi Petugas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($unitPerbaikanList as $detail)
+                                    @php
+                                        $sisaPending = max(0, (int) $detail->jumlah_perlu_perbaikan - (int) ($detail->jumlah_diperbaiki ?? 0));
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <strong class="font-monospace text-dark">{{ $detail->no_transaksi }}</strong>
+                                        </td>
+                                        <td>
+                                            <span>{{ $detail->penyewaan->pelanggan->nama_pelanggan ?? 'Umum' }}</span>
+                                        </td>
+                                        <td class="text-center fw-bold text-warning font-monospace">
+                                            {{ $detail->jumlah_perlu_perbaikan }} unit
+                                        </td>
+                                        <td class="text-center text-success font-monospace">
+                                            {{ (int) ($detail->jumlah_diperbaiki ?? 0) }} unit
+                                        </td>
+                                        <td class="text-center fw-bold text-danger font-monospace">
+                                            {{ $sisaPending }} unit
+                                        </td>
+                                        <td class="text-end">
+                                            <form action="{{ route('admin.inventaris.konfirmasi-perbaikan', $alat->kode_alat) }}" method="POST" class="d-inline-flex align-items-center gap-1 justify-content-end" onsubmit="if (this.submitted) return false; this.submitted = true;">
+                                                @csrf
+                                                <input type="hidden" name="id_detail" value="{{ $detail->id_detail }}">
+                                                <input type="number" name="jumlah" value="{{ $sisaPending }}" min="1" max="{{ $sisaPending }}" class="form-control form-control-sm text-center font-monospace" style="width: 70px;" required>
+                                                <button type="submit" class="btn btn-sm btn-success font-weight-bold d-inline-flex align-items-center gap-1 py-1 px-2" title="Konfirmasi perbaikan selesai">
+                                                    <span>✓</span>
+                                                    <span>Kembalikan ke Stok</span>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @elseif($alat->kondisi !== 'Perlu Perbaikan')
+                    <div class="text-center py-3 text-muted small">
+                        <span class="d-block mb-1 fs-5">✅</span>
+                        Tidak ada unit yang sedang dalam antrean perbaikan untuk alat ini. Seluruh stok terawat dengan baik.
+                    </div>
+                @endif
             </div>
         </div>
 

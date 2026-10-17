@@ -83,7 +83,7 @@
                 </div>
             </div>
             <div class="ac-stat-value text-danger font-monospace">{{ $totalBermasalahSemua }}</div>
-            <div class="ac-stat-sub">Tidak disewakan ke pelanggan</div>
+            <div class="ac-stat-sub">{{ $totalPerluPerbaikanSemua }} Servis &bull; {{ $totalRusakSemua }} Rusak</div>
         </div>
     </div>
 </div>
@@ -162,6 +162,16 @@
                         </td>
                         <td>
                             <x-status-badge :status="$item->kondisi" />
+                            @if($item->stok_perlu_perbaikan > 0 && $item->kondisi === 'Baik')
+                                <small class="badge bg-warning-subtle text-warning border border-warning-subtle d-block mt-1 font-monospace" style="font-size:0.68rem;">
+                                    🔧 {{ $item->stok_perlu_perbaikan }} Perlu Servis
+                                </small>
+                            @endif
+                            @if($item->stok_rusak > 0 && $item->kondisi === 'Baik')
+                                <small class="badge bg-danger-subtle text-danger border border-danger-subtle d-block mt-1 font-monospace" style="font-size:0.68rem;">
+                                    ⚠️ {{ $item->stok_rusak }} Rusak
+                                </small>
+                            @endif
                         </td>
                         <td class="text-center">
                             <span class="font-monospace fw-bold text-dark fs-6">{{ $item->stok_fisik_total }}</span>

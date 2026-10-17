@@ -90,7 +90,7 @@ class OperasionalController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if ($trx->isSedangDisewa() || $trx->isSelesai()) {
+                if ($trx->isSedangDisewa() || $trx->isSelesai() || $trx->pengambilan()->exists()) {
                     throw new \DomainException("Transaksi {$trx->no_transaksi} sudah diserahkan sebelumnya.");
                 }
 
@@ -258,8 +258,8 @@ class OperasionalController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                // Requirement 10: Cegah pengembalian dan denda ganda
-                if ($trx->isSelesai() || $trx->pengembalian) {
+                // Cegah pengembalian dan denda ganda
+                if (! $trx->isSedangDisewa() || $trx->isSelesai() || $trx->pengembalian()->exists()) {
                     throw new \DomainException("Transaksi {$trx->no_transaksi} sudah selesai dan telah dikembalikan sebelumnya.");
                 }
 

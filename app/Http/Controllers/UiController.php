@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Alat;
-use App\Models\DetailPenyewaan;
 use App\Models\Pembayaran;
 use App\Models\Penyewaan;
 use Illuminate\Support\Facades\Auth;
@@ -41,26 +40,12 @@ class UiController extends Controller
         $countMenungguPembayaran = Pembayaran::where('status_pembayaran', 'Menunggu Verifikasi')->count();
         $countSedangDisewa = Penyewaan::whereIn('status_penyewaan', ['Sedang Disewa', 'Berjalan'])->count();
 
-        // 1. Stok siap sewa (Kondisi Baik di toko yang dapat disewa)
-        $stokKondisiBaik = (int) Alat::where('kondisi', 'Baik')->sum('stok');
-
-        // 2. Stok perlu perbaikan (Master alat kondisi Perlu Perbaikan + unit pengembalian butuh perbaikan)
-        $stokPerluPerbaikanMaster = (int) Alat::where('kondisi', 'Perlu Perbaikan')->sum('stok');
-        $stokPerluPerbaikanReturn = (int) DetailPenyewaan::sum('jumlah_perlu_perbaikan');
-        $stokPerluPerbaikan = $stokPerluPerbaikanMaster + $stokPerluPerbaikanReturn;
-
-        // 3. Stok rusak / afkir (Master alat kondisi Rusak + unit pengembalian rusak)
-        $stokRusakMaster = (int) Alat::where('kondisi', 'Rusak')->sum('stok');
-        $stokRusakReturn = (int) DetailPenyewaan::sum('jumlah_rusak');
-        $stokRusak = $stokRusakMaster + $stokRusakReturn;
-
-        // 4. Stok unit yang sedang aktif dialokasikan / disewa di lapangan
-        $stokSedangDisewaUnit = (int) DetailPenyewaan::whereHas('penyewaan', function ($q) {
-            $q->whereIn('status_penyewaan', ['Siap Diambil', 'Sedang Disewa', 'Berjalan']);
-        })->selectRaw('SUM(CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) as total')->value('total');
-
-        // 5. Total seluruh stok fisik inventaris (stok toko + sedang disewa + perlu perbaikan return + rusak return)
-        $totalStokFisik = (int) Alat::sum('stok') + $stokSedangDisewaUnit + $stokPerluPerbaikanReturn + $stokRusakReturn;
+        // Ambil ringkasan inventaris terpusat dan konsisten dari model Alat
+        $ringkasan = Alat::getRingkasanInventaris();
+        $totalStokFisik = $ringkasan['total_stok_fisik'];
+        $stokKondisiBaik = $ringkasan['stok_siap_sewa'];
+        $stokPerluPerbaikan = $ringkasan['stok_perlu_perbaikan'];
+        $stokRusak = $ringkasan['stok_rusak'];
 
         return view('admin.dashboard', [
             'pesananMenunggu' => $pesananMenunggu,

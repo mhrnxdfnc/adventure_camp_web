@@ -35,7 +35,7 @@
     </div>
 @endif
 
-<form action="{{ route('admin.operasional.proses-pengembalian', $penyewaan->no_transaksi) }}" method="POST" id="form-pengembalian">
+<form action="{{ route('admin.operasional.proses-pengembalian', $penyewaan->no_transaksi) }}" method="POST" id="form-pengembalian" onsubmit="if (this.submitted) return false; this.submitted = true; const btn = document.getElementById('btn-submit-pengembalian'); if (btn) { btn.disabled = true; btn.innerHTML = 'Memproses Pengembalian...'; } return true;">
     @csrf
 
     <div class="row g-4">

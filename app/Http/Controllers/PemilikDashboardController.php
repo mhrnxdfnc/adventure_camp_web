@@ -126,9 +126,44 @@ class PemilikDashboardController extends Controller
 
         $hasMonthlyChartData = collect($grafikBulanan)->sum('total_transaksi') > 0 || collect($grafikBulanan)->sum('uang_diterima') > 0;
 
-        // 5 & 6. Daftar Alat Rusak dan Perlu Perbaikan (Real Database)
-        $alatRusakList = Alat::where('kondisi', 'Rusak')->orderBy('kode_alat')->get();
-        $alatPerluPerbaikanList = Alat::where('kondisi', 'Perlu Perbaikan')->orderBy('kode_alat')->get();
+        // 5 & 6. Ringkasan Kondisi Alat & Daftar Alat Rusak & Perlu Perbaikan (Real Database, Konsisten dengan Admin)
+        $ringkasanInventaris = Alat::getRingkasanInventaris();
+
+        $alatRusakList = Alat::with(['detailPenyewaan'])
+            ->where(function ($q) {
+                $q->where('kondisi', 'Rusak')
+                    ->orWhereHas('detailPenyewaan', function ($sub) {
+                        $sub->where('jumlah_rusak', '>', 0);
+                    });
+            })
+            ->orderBy('kode_alat')
+            ->get()
+            ->map(function ($alat) {
+                $rusakReturn = (int) $alat->detailPenyewaan->sum('jumlah_rusak');
+                $rusakMaster = ($alat->kondisi === 'Rusak') ? (int) $alat->stok : 0;
+                $alat->total_unit_rusak = $rusakMaster + $rusakReturn;
+
+                return $alat;
+            });
+
+        $alatPerluPerbaikanList = Alat::with(['detailPenyewaan'])
+            ->where(function ($q) {
+                $q->where('kondisi', 'Perlu Perbaikan')
+                    ->orWhereHas('detailPenyewaan', function ($sub) {
+                        $sub->whereRaw('jumlah_perlu_perbaikan > COALESCE(jumlah_diperbaiki, 0)');
+                    });
+            })
+            ->orderBy('kode_alat')
+            ->get()
+            ->map(function ($alat) {
+                $perbaikanReturn = (int) $alat->detailPenyewaan->sum(function ($d) {
+                    return max(0, (int) $d->jumlah_perlu_perbaikan - (int) ($d->jumlah_diperbaiki ?? 0));
+                });
+                $perbaikanMaster = ($alat->kondisi === 'Perlu Perbaikan') ? (int) $alat->stok : 0;
+                $alat->total_unit_perbaikan = $perbaikanMaster + $perbaikanReturn;
+
+                return $alat;
+            });
 
         // 7. Ringkasan Transaksi Pelanggan (Real Database, Read-Only)
         $pesananList = Penyewaan::with(['pelanggan', 'pembayaran', 'detailPenyewaan.alat'])
@@ -150,6 +185,7 @@ class PemilikDashboardController extends Controller
             'hasDailyChartData' => $hasDailyChartData,
             'grafikBulanan' => $grafikBulanan,
             'hasMonthlyChartData' => $hasMonthlyChartData,
+            'ringkasanInventaris' => $ringkasanInventaris,
             'alatRusakList' => $alatRusakList,
             'alatPerluPerbaikanList' => $alatPerluPerbaikanList,
             'pesananList' => $pesananList,

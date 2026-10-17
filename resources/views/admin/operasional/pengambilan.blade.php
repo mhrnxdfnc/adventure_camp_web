@@ -114,7 +114,7 @@
                     <div class="modal fade" id="modalSerahTerima{{ str_replace('-', '', $trx->no_transaksi) }}" tabindex="-1" aria-labelledby="modalSerahTerimaLabel{{ str_replace('-', '', $trx->no_transaksi) }}" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered modal-lg">
                             <div class="modal-content border-0 shadow">
-                                <form action="{{ route('admin.operasional.proses-pengambilan', $trx->no_transaksi) }}" method="POST">
+                                <form action="{{ route('admin.operasional.proses-pengambilan', $trx->no_transaksi) }}" method="POST" onsubmit="if (this.submitted) return false; this.submitted = true; const btn = this.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.innerHTML = 'Memproses...'; } return true;">
                                     @csrf
                                     <div class="modal-header bg-success text-white">
                                         <h5 class="modal-title h6 font-weight-bold mb-0" id="modalSerahTerimaLabel{{ str_replace('-', '', $trx->no_transaksi) }}">
