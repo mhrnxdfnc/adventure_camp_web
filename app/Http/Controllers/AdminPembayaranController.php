@@ -138,13 +138,17 @@ class AdminPembayaranController extends Controller
 
         try {
             DB::transaction(function () use ($penyewaan, $jumlahDiterima, $totalBiaya, $request) {
-                $pembayaran = Pembayaran::where('no_transaksi', $penyewaan->no_transaksi)
+                $trx = Penyewaan::where('no_transaksi', $penyewaan->no_transaksi)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $pembayaran = Pembayaran::where('no_transaksi', $trx->no_transaksi)
                     ->lockForUpdate()
                     ->first();
 
-                // Requirement 13: Cegah konfirmasi ganda yang menyebabkan nominal pembayaran tercatat dua kali
+                // Requirement 11 & 13: Cegah konfirmasi ganda yang menyebabkan nominal pembayaran tercatat dua kali
                 if ($pembayaran && $pembayaran->status_pembayaran === 'Lunas') {
-                    throw new \DomainException("Transaksi {$penyewaan->no_transaksi} sudah berstatus Lunas sebelumnya. Konfirmasi ganda dicegah.");
+                    throw new \DomainException("Transaksi {$trx->no_transaksi} sudah berstatus Lunas sebelumnya. Konfirmasi ganda dicegah.");
                 }
 
                 $metode = $request->input('metode_pembayaran')
@@ -154,7 +158,7 @@ class AdminPembayaranController extends Controller
                 if (! $pembayaran) {
                     $pembayaran = new Pembayaran;
                     $pembayaran->no_pembayaran = Pembayaran::generateNoPembayaran();
-                    $pembayaran->no_transaksi = $penyewaan->no_transaksi;
+                    $pembayaran->no_transaksi = $trx->no_transaksi;
                 }
 
                 // Requirement 10: Catat Admin yang konfirmasi, waktu, metode, dan nominal yang diterima
@@ -168,9 +172,9 @@ class AdminPembayaranController extends Controller
                 $pembayaran->save();
 
                 // Perbarui status penyewaan menjadi 'Siap Diambil' setelah pembayaran lunas
-                if (in_array($penyewaan->status_penyewaan, ['Menunggu Pembayaran', 'Disetujui'], true)) {
-                    $penyewaan->status_penyewaan = 'Siap Diambil';
-                    $penyewaan->save();
+                if (in_array($trx->status_penyewaan, ['Menunggu Pembayaran', 'Disetujui'], true)) {
+                    $trx->status_penyewaan = 'Siap Diambil';
+                    $trx->save();
                 }
 
                 // Requirement 14: Catat perubahan status dalam audit trail
@@ -178,7 +182,7 @@ class AdminPembayaranController extends Controller
                     Auth::id(),
                     'Konfirmasi Pembayaran Lunas',
                     'Pembayaran',
-                    "No Transaksi: {$penyewaan->no_transaksi}, No Pembayaran: {$pembayaran->no_pembayaran}, Metode: {$metode}, Nominal: Rp ".number_format($jumlahDiterima, 0, ',', '.').', Status: Lunas'
+                    "No Transaksi: {$trx->no_transaksi}, No Pembayaran: {$pembayaran->no_pembayaran}, Metode: {$metode}, Nominal: Rp ".number_format($jumlahDiterima, 0, ',', '.').', Status: Lunas'
                 );
             });
         } catch (\DomainException $e) {
@@ -216,7 +220,11 @@ class AdminPembayaranController extends Controller
 
         try {
             DB::transaction(function () use ($penyewaan, $alasan) {
-                $pembayaran = Pembayaran::where('no_transaksi', $penyewaan->no_transaksi)
+                $trx = Penyewaan::where('no_transaksi', $penyewaan->no_transaksi)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $pembayaran = Pembayaran::where('no_transaksi', $trx->no_transaksi)
                     ->lockForUpdate()
                     ->first();
 
@@ -227,8 +235,8 @@ class AdminPembayaranController extends Controller
                 if (! $pembayaran) {
                     $pembayaran = new Pembayaran;
                     $pembayaran->no_pembayaran = Pembayaran::generateNoPembayaran();
-                    $pembayaran->no_transaksi = $penyewaan->no_transaksi;
-                    $pembayaran->total_biaya = $penyewaan->total_biaya;
+                    $pembayaran->no_transaksi = $trx->no_transaksi;
+                    $pembayaran->total_biaya = $trx->total_biaya;
                     $pembayaran->jumlah_pembayaran = 0;
                     $pembayaran->metode_pembayaran = 'Transfer Bank';
                 }

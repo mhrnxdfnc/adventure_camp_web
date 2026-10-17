@@ -310,7 +310,7 @@
                         <div class="modal fade" id="modalKonfirmasi{{ str_replace('-', '', $trx->no_transaksi) }}" tabindex="-1" aria-labelledby="modalKonfirmasiLabel{{ str_replace('-', '', $trx->no_transaksi) }}" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content border-0 shadow">
-                                    <form action="{{ route('admin.pembayaran.konfirmasi', $trx->no_transaksi) }}" method="POST">
+                                    <form action="{{ route('admin.pembayaran.konfirmasi', $trx->no_transaksi) }}" method="POST" id="formKonfirmasi_{{ str_replace('-', '', $trx->no_transaksi) }}" onsubmit="if (this.submitted) { return false; } this.submitted = true; const btn = this.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class=\'spinner-border spinner-border-sm me-1\'></span> Memproses...'; } return true;">
                                         @csrf
                                         <div class="modal-header bg-success text-white">
                                             <h5 class="modal-title h6 font-weight-bold mb-0" id="modalKonfirmasiLabel{{ str_replace('-', '', $trx->no_transaksi) }}">
@@ -391,7 +391,7 @@
                         <div class="modal fade" id="modalTolak{{ str_replace('-', '', $trx->no_transaksi) }}" tabindex="-1" aria-labelledby="modalTolakLabel{{ str_replace('-', '', $trx->no_transaksi) }}" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content border-0 shadow">
-                                    <form action="{{ route('admin.pembayaran.tolak', $trx->no_transaksi) }}" method="POST">
+                                    <form action="{{ route('admin.pembayaran.tolak', $trx->no_transaksi) }}" method="POST" id="formTolak_{{ str_replace('-', '', $trx->no_transaksi) }}" onsubmit="if (this.submitted) { return false; } this.submitted = true; const btn = this.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class=\'spinner-border spinner-border-sm me-1\'></span> Memproses...'; } return true;">
                                         @csrf
                                         <div class="modal-header bg-danger text-white">
                                             <h5 class="modal-title h6 font-weight-bold mb-0" id="modalTolakLabel{{ str_replace('-', '', $trx->no_transaksi) }}">

@@ -27,7 +27,12 @@ class PembayaranController extends Controller
         $user = Auth::user();
 
         // 1. Pencegahan IDOR: Pengguna hanya boleh melihat transaksi miliknya sendiri
-        if (! $user->id_pelanggan || (int) $penyewaan->id_pelanggan !== (int) $user->id_pelanggan) {
+        $isCustomerOwner = (
+            ($user->id_pelanggan && (int) $penyewaan->id_pelanggan === (int) $user->id_pelanggan) ||
+            ($user->id_user && (int) $penyewaan->id_user === (int) $user->id_user)
+        );
+
+        if (! $isCustomerOwner) {
             abort(Response::HTTP_FORBIDDEN, 'Anda tidak memiliki hak akses untuk melihat data transaksi ini.');
         }
 

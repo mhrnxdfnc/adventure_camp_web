@@ -20,8 +20,8 @@ class AdminPesananController extends Controller
     public static function getInstruksiPembayaran(string $metode): string
     {
         return match ($metode) {
-            'Cash' => 'Pelanggan memilih metode pembayaran Tunai (Cash). Arahkan pelanggan untuk melakukan pembayaran langsung di kasir toko saat pengambilan alat.',
-            'QRIS' => 'Pelanggan memilih metode QRIS. Arahkan pelanggan untuk memindai kode QRIS toko (tersedia di kasir toko atau portal pembayaran pelanggan) dan verifikasi bukti pembayaran setelah transaksi selesai.',
+            'Cash' => 'Pelanggan memilih metode pembayaran Tunai (Cash). Arahkan pelanggan untuk melakukan pembayaran langsung kepada kasir atau Admin saat pengambilan alat.',
+            'QRIS' => 'Pelanggan memilih metode QRIS. Silakan minta kode QRIS kepada kasir untuk melanjutkan pembayaran. Admin akan memverifikasi mutasi setelah pembayaran berhasil.',
             'Transfer Bank' => 'Pelanggan memilih Transfer Bank. Pelanggan dapat mentransfer ke rekening resmi toko (BCA / Mandiri) dan mengunggah bukti transfer untuk diverifikasi Admin di menu Verifikasi Pembayaran.',
             default => "Pelanggan dapat menyelesaikan pembayaran menggunakan metode {$metode}."
         };

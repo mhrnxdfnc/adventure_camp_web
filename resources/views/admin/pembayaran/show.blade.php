@@ -221,7 +221,7 @@
                         <h4 class="h6 font-weight-bold text-dark mb-3">Tindakan Admin:</h4>
                         
                         <!-- Form Konfirmasi Lunas -->
-                        <form action="{{ route('admin.pembayaran.konfirmasi', $penyewaan->no_transaksi) }}" method="POST" class="mb-3">
+                        <form action="{{ route('admin.pembayaran.konfirmasi', $penyewaan->no_transaksi) }}" method="POST" class="mb-3" id="formKonfirmasiShow" onsubmit="if (this.submitted) { return false; } this.submitted = true; const btn = this.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class=\'spinner-border spinner-border-sm me-1\'></span> Memproses...'; } return confirm('Apakah Anda yakin ingin mengonfirmasi pembayaran transaksi ini sebagai LUNAS?');">
                             @csrf
                             <input type="hidden" name="metode_pembayaran" value="{{ $metode }}">
                             <div class="mb-2">
@@ -234,19 +234,19 @@
                                        required>
                                 <small class="text-muted" style="font-size: 0.72rem;">* Harus melunasi seluruh tagihan.</small>
                             </div>
-                            <button type="submit" class="btn btn-success w-100 font-weight-bold btn-sm py-2" onclick="return confirm('Apakah Anda yakin ingin mengonfirmasi pembayaran transaksi ini sebagai LUNAS?')">
+                            <button type="submit" class="btn btn-success w-100 font-weight-bold btn-sm py-2">
                                 ✓ Konfirmasi Pembayaran Lunas
                             </button>
                         </form>
 
                         <!-- Form Tolak Pembayaran -->
-                        <form action="{{ route('admin.pembayaran.tolak', $penyewaan->no_transaksi) }}" method="POST">
+                        <form action="{{ route('admin.pembayaran.tolak', $penyewaan->no_transaksi) }}" method="POST" id="formTolakShow" onsubmit="if (this.submitted) { return false; } this.submitted = true; const btn = this.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class=\'spinner-border spinner-border-sm me-1\'></span> Memproses...'; } return confirm('Apakah Anda yakin ingin MENOLAK pembayaran ini?');">
                             @csrf
                             <div class="mb-2">
                                 <label class="form-label small font-weight-bold text-danger">Alasan Penolakan (Wajib):</label>
                                 <textarea name="alasan_penolakan" class="form-control form-control-sm" rows="2" placeholder="Wajib diisi alasan penolakan..." required minlength="5" maxlength="500"></textarea>
                             </div>
-                            <button type="submit" class="btn btn-outline-danger w-100 btn-sm" onclick="return confirm('Apakah Anda yakin ingin MENOLAK pembayaran ini?')">
+                            <button type="submit" class="btn btn-outline-danger w-100 btn-sm">
                                 ✕ Tolak Bukti Pembayaran
                             </button>
                         </form>
