@@ -125,7 +125,7 @@ class Penyewaan extends Model
 
         $reserved = (int) DetailPenyewaan::where('kode_alat', $kodeAlat)
             ->whereHas('penyewaan', function ($q) use ($sewaStr, $kembaliStr, $excludeNoTransaksi) {
-                $q->whereIn('status_penyewaan', ['Menunggu Pembayaran', 'Disetujui', 'Siap Diambil'])
+                $q->whereIn('status_penyewaan', ['Menunggu Pembayaran', 'Disetujui', 'Siap Diambil', 'Sedang Disewa', 'Berjalan'])
                     ->whereDate('tanggal_sewa', '<', $kembaliStr)
                     ->whereDate('tanggal_kembali', '>', $sewaStr);
 

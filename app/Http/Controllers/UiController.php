@@ -32,7 +32,7 @@ class UiController extends Controller
      */
     public function adminDashboard(): View
     {
-        $pesananMenunggu = Penyewaan::with(['pelanggan', 'detailPenyewaan.alat'])
+        $pesananMenunggu = Penyewaan::with(['pelanggan', 'pembayaran', 'detailPenyewaan.alat'])
             ->where('status_penyewaan', 'Menunggu Konfirmasi')
             ->orderBy('tanggal_sewa', 'asc')
             ->get();

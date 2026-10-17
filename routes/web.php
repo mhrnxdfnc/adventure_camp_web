@@ -58,7 +58,8 @@ Route::middleware(['auth', 'role:Admin'])
         // CRUD Master Data Alat Camping
         Route::resource('alat', AlatController::class)->parameters(['alat' => 'kode_alat']);
 
-        // Persetujuan & Penolakan Pengajuan Pesanan
+        // Detail, Persetujuan & Penolakan Pengajuan Pesanan
+        Route::get('/pesanan/{no_transaksi}', [AdminPesananController::class, 'show'])->name('pesanan.show');
         Route::post('/pesanan/{no_transaksi}/setujui', [AdminPesananController::class, 'setujui'])->name('pesanan.setujui');
         Route::post('/pesanan/{no_transaksi}/tolak', [AdminPesananController::class, 'tolak'])->name('pesanan.tolak');
 
