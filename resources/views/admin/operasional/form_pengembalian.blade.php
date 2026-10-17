@@ -92,9 +92,10 @@
                             <thead class="table-light small">
                                 <tr>
                                     <th>Nama Alat</th>
-                                    <th class="text-center" style="width: 100px;">Disewa</th>
-                                    <th class="text-center" style="width: 130px;">Kondisi Baik</th>
-                                    <th class="text-center" style="width: 130px;">Rusak / Cacat</th>
+                                    <th class="text-center" style="width: 80px;">Disewa</th>
+                                    <th class="text-center" style="width: 120px;">Kondisi Baik</th>
+                                    <th class="text-center" style="width: 120px;">Perlu Perbaikan</th>
+                                    <th class="text-center" style="width: 120px;">Rusak / Afkir</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -126,7 +127,22 @@
                                                        required>
                                                 <span class="input-group-text text-success bg-success-subtle">✓</span>
                                             </div>
-                                            <small class="text-success" style="font-size: 0.7rem;">Masuk stok sewa</small>
+                                            <small class="text-success d-block text-center mt-1" style="font-size: 0.68rem;">Siap sewa</small>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" 
+                                                       name="items[{{ $detail->kode_alat }}][perlu_perbaikan]" 
+                                                       id="item-perbaikan-{{ $detail->kode_alat }}"
+                                                       class="form-control text-center input-kondisi-perbaikan" 
+                                                       data-kode="{{ $detail->kode_alat }}"
+                                                       value="{{ old('items.' . $detail->kode_alat . '.perlu_perbaikan', 0) }}" 
+                                                       min="0" 
+                                                       max="{{ $qtyDisewa }}" 
+                                                       required>
+                                                <span class="input-group-text text-warning bg-warning-subtle">🔧</span>
+                                            </div>
+                                            <small class="text-warning d-block text-center mt-1" style="font-size: 0.68rem;">Antrean servis</small>
                                         </td>
                                         <td>
                                             <div class="input-group input-group-sm">
@@ -141,7 +157,7 @@
                                                        required>
                                                 <span class="input-group-text text-danger bg-danger-subtle">✕</span>
                                             </div>
-                                            <small class="text-danger" style="font-size: 0.7rem;">Tidak masuk stok</small>
+                                            <small class="text-danger d-block text-center mt-1" style="font-size: 0.68rem;">Afkir / Rusak</small>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -150,7 +166,7 @@
                     </div>
                 </div>
                 <div class="ac-card-footer bg-light p-3 small text-muted">
-                    <em>Perhatian: Total alat kembali (Baik + Rusak) harus sama persis dengan jumlah alat yang disewa.</em>
+                    <em>Perhatian: Total alat kembali (Baik + Perlu Perbaikan + Rusak) harus sama persis dengan jumlah alat yang disewa.</em>
                 </div>
             </div>
         </div>
@@ -349,34 +365,69 @@ document.addEventListener('DOMContentLoaded', function () {
     tglAktualInput.addEventListener('change', hitungDenda);
     inputKerusakan.addEventListener('input', hitungDenda);
 
-    // Otomatis sinkronisasi input kondisi baik vs rusak
-    document.querySelectorAll('.input-kondisi-baik').forEach(function(inputBaik) {
-        inputBaik.addEventListener('input', function() {
-            const kode = this.getAttribute('data-kode');
-            const max = parseInt(document.getElementById('max-qty-' + kode).value) || 0;
-            let val = parseInt(this.value) || 0;
-            if (val > max) val = max;
-            if (val < 0) val = 0;
-            this.value = val;
-            const inputRusak = document.getElementById('item-rusak-' + kode);
-            if (inputRusak) {
-                inputRusak.value = max - val;
+    // Otomatis sinkronisasi input kondisi baik, perlu perbaikan, dan rusak
+    function syncKondisi(kode, sourceField) {
+        const max = parseInt(document.getElementById('max-qty-' + kode).value) || 0;
+        const inputBaik = document.getElementById('item-baik-' + kode);
+        const inputRepair = document.getElementById('item-perbaikan-' + kode);
+        const inputRusak = document.getElementById('item-rusak-' + kode);
+
+        let baik = parseInt(inputBaik.value) || 0;
+        let repair = parseInt(inputRepair.value) || 0;
+        let rusak = parseInt(inputRusak.value) || 0;
+
+        if (baik < 0) baik = 0;
+        if (repair < 0) repair = 0;
+        if (rusak < 0) rusak = 0;
+
+        if (sourceField === 'baik') {
+            if (baik > max) baik = max;
+            inputBaik.value = baik;
+            let sisa = max - baik;
+            if (repair > sisa) {
+                repair = sisa;
+                inputRepair.value = repair;
             }
+            rusak = sisa - repair;
+            inputRusak.value = rusak;
+        } else if (sourceField === 'perbaikan') {
+            if (repair > max) repair = max;
+            inputRepair.value = repair;
+            let sisa = max - repair;
+            if (baik > sisa) {
+                baik = sisa;
+                inputBaik.value = baik;
+            }
+            rusak = sisa - baik;
+            inputRusak.value = rusak;
+        } else if (sourceField === 'rusak') {
+            if (rusak > max) rusak = max;
+            inputRusak.value = rusak;
+            let sisa = max - rusak;
+            if (baik > sisa) {
+                baik = sisa;
+                inputBaik.value = baik;
+            }
+            repair = sisa - baik;
+            inputRepair.value = repair;
+        }
+    }
+
+    document.querySelectorAll('.input-kondisi-baik').forEach(function(input) {
+        input.addEventListener('input', function() {
+            syncKondisi(this.getAttribute('data-kode'), 'baik');
         });
     });
 
-    document.querySelectorAll('.input-kondisi-rusak').forEach(function(inputRusak) {
-        inputRusak.addEventListener('input', function() {
-            const kode = this.getAttribute('data-kode');
-            const max = parseInt(document.getElementById('max-qty-' + kode).value) || 0;
-            let val = parseInt(this.value) || 0;
-            if (val > max) val = max;
-            if (val < 0) val = 0;
-            this.value = val;
-            const inputBaik = document.getElementById('item-baik-' + kode);
-            if (inputBaik) {
-                inputBaik.value = max - val;
-            }
+    document.querySelectorAll('.input-kondisi-perbaikan').forEach(function(input) {
+        input.addEventListener('input', function() {
+            syncKondisi(this.getAttribute('data-kode'), 'perbaikan');
+        });
+    });
+
+    document.querySelectorAll('.input-kondisi-rusak').forEach(function(input) {
+        input.addEventListener('input', function() {
+            syncKondisi(this.getAttribute('data-kode'), 'rusak');
         });
     });
 });

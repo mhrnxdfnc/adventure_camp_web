@@ -23,6 +23,7 @@ class DetailPenyewaan extends Model
         'tarif_sewa',
         'jumlah_diserahkan',
         'jumlah_kembali_baik',
+        'jumlah_perlu_perbaikan',
         'jumlah_rusak',
     ];
 
@@ -33,6 +34,7 @@ class DetailPenyewaan extends Model
             'tarif_sewa' => 'decimal:2',
             'jumlah_diserahkan' => 'integer',
             'jumlah_kembali_baik' => 'integer',
+            'jumlah_perlu_perbaikan' => 'integer',
             'jumlah_rusak' => 'integer',
         ];
     }

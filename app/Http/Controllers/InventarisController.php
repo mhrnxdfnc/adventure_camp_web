@@ -53,15 +53,23 @@ class InventarisController extends Controller
             ->groupBy('kode_alat')
             ->pluck('total_alokasi', 'kode_alat');
 
+        // Agregasi unit rusak & perbaikan dari pengembalian sewa per kode_alat
+        $kondisiReturnMap = DetailPenyewaan::selectRaw('kode_alat, SUM(jumlah_rusak) as total_rusak, SUM(jumlah_perlu_perbaikan) as total_perbaikan')
+            ->groupBy('kode_alat')
+            ->get()
+            ->keyBy('kode_alat');
+
         // Kalkulasi metrik inventaris per alat
-        $inventarisData = $alatList->map(function ($alat) use ($dialokasikanMap) {
+        $inventarisData = $alatList->map(function ($alat) use ($dialokasikanMap, $kondisiReturnMap) {
             $dialokasikan = (int) ($dialokasikanMap[$alat->kode_alat] ?? 0);
+            $rusakReturn = (int) ($kondisiReturnMap[$alat->kode_alat]->total_rusak ?? 0);
+            $perbaikanReturn = (int) ($kondisiReturnMap[$alat->kode_alat]->total_perbaikan ?? 0);
             $stokToko = (int) $alat->stok;
-            $stokFisikTotal = $stokToko + $dialokasikan;
+            $stokFisikTotal = $stokToko + $dialokasikan + $rusakReturn + $perbaikanReturn;
 
             // Aturan Bisnis: Alat rusak / perlu perbaikan TIDAK dihitung sebagai stok siap sewa
             $stokSiapSewa = ($alat->kondisi === 'Baik') ? $stokToko : 0;
-            $stokRusak = ($alat->kondisi !== 'Baik') ? $stokToko : 0;
+            $stokRusak = (($alat->kondisi !== 'Baik') ? $stokToko : 0) + $rusakReturn + $perbaikanReturn;
 
             return (object) [
                 'alat' => $alat,
@@ -133,10 +141,13 @@ class InventarisController extends Controller
             return $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah;
         });
 
+        $rusakReturn = (int) DetailPenyewaan::where('kode_alat', $kode_alat)->sum('jumlah_rusak');
+        $perbaikanReturn = (int) DetailPenyewaan::where('kode_alat', $kode_alat)->sum('jumlah_perlu_perbaikan');
+
         $stokToko = (int) $alat->stok;
-        $stokFisikTotal = $stokToko + $jumlahDialokasikan;
+        $stokFisikTotal = $stokToko + $jumlahDialokasikan + $rusakReturn + $perbaikanReturn;
         $stokSiapSewa = ($alat->kondisi === 'Baik') ? $stokToko : 0;
-        $stokRusak = ($alat->kondisi !== 'Baik') ? $stokToko : 0;
+        $stokRusak = (($alat->kondisi !== 'Baik') ? $stokToko : 0) + $rusakReturn + $perbaikanReturn;
 
         // Ambil riwayat perubahan stok khusus alat ini
         $riwayatStok = $alat->riwayatStok()->with('user')->take(30)->get();

@@ -227,4 +227,137 @@ class PengembalianTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    /**
+     * Pengembalian 1 unit rusak dari transaksi multi-unit merefleksikan perubahan stok rusak pada dashboard
+     */
+    public function test_return_one_damaged_unit_from_multi_unit_transaction_updates_dashboard_rusak_stock(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        // 1. Ambil kondisi dashboard sebelum pengembalian
+        $dashBefore = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dashBefore->assertStatus(200);
+        $stokRusakAwal = $dashBefore->viewData('stokRusak');
+        $stokBaikAwal = $dashBefore->viewData('stokKondisiBaik');
+
+        $penyewaan = $this->prepareSedangDisewa();
+        $stokAwalAlt2 = Alat::find('ALT002')->stok;
+
+        // 2. Kembalikan ALT001 (1 unit baik) dan ALT002 (2 unit: 1 baik, 1 rusak)
+        $response = $this->actingAs($admin)->post(route('admin.operasional.proses-pengembalian', $penyewaan->no_transaksi), [
+            'tanggal_pengembalian_aktual' => '2026-10-18',
+            'items' => [
+                'ALT001' => ['baik' => 1, 'perlu_perbaikan' => 0, 'rusak' => 0],
+                'ALT002' => ['baik' => 1, 'perlu_perbaikan' => 0, 'rusak' => 1],
+            ],
+            'nominal_denda' => 25000,
+            'alasan_denda' => '1 unit ALT002 resleting robek permanen.',
+        ]);
+
+        $response->assertRedirect(route('admin.operasional.pengembalian'));
+
+        // 3. Pastikan stok toko ALT002 hanya bertambah 1 (unit baik)
+        $this->assertEquals($stokAwalAlt2 + 1, Alat::find('ALT002')->stok);
+
+        // 4. Periksa dashboard setelah pengembalian: Stok Rusak harus bertambah 1 unit
+        $dashAfter = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dashAfter->assertStatus(200);
+
+        $this->assertEquals($stokRusakAwal + 1, $dashAfter->viewData('stokRusak'));
+        $this->assertEquals($stokBaikAwal + 2, $dashAfter->viewData('stokKondisiBaik')); // 1 ALT001 + 1 ALT002
+        $dashAfter->assertSee(($stokRusakAwal + 1).' Unit');
+    }
+
+    /**
+     * Pengembalian barang berkondisi baik dan barang yang perlu perbaikan
+     */
+    public function test_return_good_and_needs_repair_items_updates_dashboard_accurately(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        // 1. Ambil kondisi dashboard sebelum pengembalian
+        $dashBefore = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dashBefore->assertStatus(200);
+        $stokPerbaikanAwal = $dashBefore->viewData('stokPerluPerbaikan');
+        $stokBaikAwal = $dashBefore->viewData('stokKondisiBaik');
+
+        $penyewaan = $this->prepareSedangDisewa();
+        $stokAwalAlt2 = Alat::find('ALT002')->stok;
+
+        // 2. Kembalikan ALT001 (1 unit baik) dan ALT002 (1 baik, 1 perlu perbaikan, 0 rusak)
+        $response = $this->actingAs($admin)->post(route('admin.operasional.proses-pengembalian', $penyewaan->no_transaksi), [
+            'tanggal_pengembalian_aktual' => '2026-10-18',
+            'items' => [
+                'ALT001' => ['baik' => 1, 'perlu_perbaikan' => 0, 'rusak' => 0],
+                'ALT002' => ['baik' => 1, 'perlu_perbaikan' => 1, 'rusak' => 0],
+            ],
+            'nominal_denda' => 10000,
+            'alasan_denda' => 'Biaya laundry dan pembersihan noda lumpur.',
+        ]);
+
+        $response->assertRedirect(route('admin.operasional.pengembalian'));
+
+        // 3. Pastikan database menyimpan kolom jumlah_perlu_perbaikan
+        $detailAlt2 = DetailPenyewaan::where('no_transaksi', $penyewaan->no_transaksi)
+            ->where('kode_alat', 'ALT002')
+            ->first();
+        $this->assertEquals(1, $detailAlt2->jumlah_kembali_baik);
+        $this->assertEquals(1, $detailAlt2->jumlah_perlu_perbaikan);
+        $this->assertEquals(0, $detailAlt2->jumlah_rusak);
+
+        // 4. Pastikan stok toko ALT002 hanya bertambah 1 (unit baik, unit perbaikan tidak masuk stok siap sewa)
+        $this->assertEquals($stokAwalAlt2 + 1, Alat::find('ALT002')->stok);
+
+        // 5. Periksa dashboard setelah pengembalian: Stok Perlu Perbaikan bertambah 1
+        $dashAfter = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dashAfter->assertStatus(200);
+        $this->assertEquals($stokPerbaikanAwal + 1, $dashAfter->viewData('stokPerluPerbaikan'));
+        $this->assertEquals($stokBaikAwal + 2, $dashAfter->viewData('stokKondisiBaik'));
+        $dashAfter->assertSee(($stokPerbaikanAwal + 1).' Unit');
+    }
+
+    /**
+     * Konsistensi stok setelah halaman dimuat ulang (page reload)
+     */
+    public function test_stock_consistency_persists_after_page_reload(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $penyewaan = $this->prepareSedangDisewa();
+
+        // Proses pengembalian kombinasi (1 baik, 1 rusak)
+        $this->actingAs($admin)->post(route('admin.operasional.proses-pengembalian', $penyewaan->no_transaksi), [
+            'tanggal_pengembalian_aktual' => '2026-10-18',
+            'items' => [
+                'ALT001' => ['baik' => 1, 'perlu_perbaikan' => 0, 'rusak' => 0],
+                'ALT002' => ['baik' => 1, 'perlu_perbaikan' => 0, 'rusak' => 1],
+            ],
+            'nominal_denda' => 0,
+        ]);
+
+        // Load 1: Dashboard pertama kali
+        $dash1 = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dash1->assertStatus(200);
+        $stokBaik1 = $dash1->viewData('stokKondisiBaik');
+        $stokPerbaikan1 = $dash1->viewData('stokPerluPerbaikan');
+        $stokRusak1 = $dash1->viewData('stokRusak');
+        $totalFisik1 = $dash1->viewData('totalStokFisik');
+
+        // Load 2: Reload dashboard halaman yang sama
+        $dash2 = $this->actingAs($admin)->get(route('admin.dashboard'));
+        $dash2->assertStatus(200);
+        $stokBaik2 = $dash2->viewData('stokKondisiBaik');
+        $stokPerbaikan2 = $dash2->viewData('stokPerluPerbaikan');
+        $stokRusak2 = $dash2->viewData('stokRusak');
+        $totalFisik2 = $dash2->viewData('totalStokFisik');
+
+        // Nilai harus persis sama dan konsisten
+        $this->assertSame($stokBaik1, $stokBaik2);
+        $this->assertSame($stokPerbaikan1, $stokPerbaikan2);
+        $this->assertSame($stokRusak1, $stokRusak2);
+        $this->assertSame($totalFisik1, $totalFisik2);
+
+        // Nilai stok rusak tidak boleh 0
+        $this->assertGreaterThan(0, $stokRusak2);
+    }
 }

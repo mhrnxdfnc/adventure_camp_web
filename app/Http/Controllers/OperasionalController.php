@@ -232,6 +232,7 @@ class OperasionalController extends Controller
             'tanggal_pengembalian_aktual' => ['required', 'date', 'after_or_equal:'.$penyewaan->tanggal_sewa->format('Y-m-d')],
             'items' => ['required', 'array'],
             'items.*.baik' => ['required', 'integer', 'min:0'],
+            'items.*.perlu_perbaikan' => ['nullable', 'integer', 'min:0'],
             'items.*.rusak' => ['required', 'integer', 'min:0'],
             'nominal_denda' => ['nullable', 'numeric', 'min:0'],
             'alasan_denda' => ['nullable', 'string', 'max:255'],
@@ -270,8 +271,9 @@ class OperasionalController extends Controller
                 foreach ($trx->detailPenyewaan as $detail) {
                     $itemData = $itemsInput[$detail->kode_alat] ?? [];
                     $jumlahBaik = max(0, (int) ($itemData['baik'] ?? 0));
+                    $jumlahPerbaikan = max(0, (int) ($itemData['perlu_perbaikan'] ?? 0));
                     $jumlahRusak = max(0, (int) ($itemData['rusak'] ?? 0));
-                    $totalKembali = $jumlahBaik + $jumlahRusak;
+                    $totalKembali = $jumlahBaik + $jumlahPerbaikan + $jumlahRusak;
 
                     $jumlahAcuan = $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah;
 
@@ -281,6 +283,7 @@ class OperasionalController extends Controller
 
                     // Simpan kuantitas kondisi aktual ke detail_penyewaan
                     $detail->jumlah_kembali_baik = $jumlahBaik;
+                    $detail->jumlah_perlu_perbaikan = $jumlahPerbaikan;
                     $detail->jumlah_rusak = $jumlahRusak;
                     $detail->save();
 
@@ -292,27 +295,42 @@ class OperasionalController extends Controller
                             $alat->stok = $alat->stok + $jumlahBaik;
                             $alat->save();
 
+                            $rincianPerubahan = ["{$jumlahBaik} Baik"];
+                            if ($jumlahPerbaikan > 0) {
+                                $rincianPerubahan[] = "{$jumlahPerbaikan} Perlu Perbaikan";
+                            }
+                            if ($jumlahRusak > 0) {
+                                $rincianPerubahan[] = "{$jumlahRusak} Rusak";
+                            }
+
                             RiwayatStok::recordChange(
                                 $detail->kode_alat,
                                 'Pengembalian Sewa',
                                 $stokSebelum,
                                 +$jumlahBaik,
                                 $alat->stok,
-                                "Pengembalian pesanan {$trx->no_transaksi} ({$jumlahBaik} Baik".($jumlahRusak > 0 ? ", {$jumlahRusak} Rusak" : '').')',
+                                "Pengembalian pesanan {$trx->no_transaksi} (".implode(', ', $rincianPerubahan).')',
                                 Auth::id()
                             );
                         }
-                        // Alat rusak TIDAK ditambahkan ke stok siap sewa
-                        if ($jumlahRusak > 0) {
+
+                        // Unit rusak atau perlu perbaikan TIDAK ditambahkan ke stok siap sewa
+                        if ($jumlahRusak > 0 || $jumlahPerbaikan > 0) {
                             $adaKerusakan = true;
                         }
                     }
 
-                    if ($jumlahRusak > 0) {
-                        $ringkasanKondisi[] = "{$detail->kode_alat}: {$jumlahBaik} Baik, {$jumlahRusak} Rusak";
-                    } else {
-                        $ringkasanKondisi[] = "{$detail->kode_alat}: {$jumlahBaik} Baik";
+                    $partRingkasan = [];
+                    if ($jumlahBaik > 0) {
+                        $partRingkasan[] = "{$jumlahBaik} Baik";
                     }
+                    if ($jumlahPerbaikan > 0) {
+                        $partRingkasan[] = "{$jumlahPerbaikan} Perlu Perbaikan";
+                    }
+                    if ($jumlahRusak > 0) {
+                        $partRingkasan[] = "{$jumlahRusak} Rusak";
+                    }
+                    $ringkasanKondisi[] = "{$detail->kode_alat}: ".implode(', ', $partRingkasan);
                 }
 
                 $kondisiTeks = empty($ringkasanKondisi) ? 'Baik' : implode('; ', $ringkasanKondisi);
