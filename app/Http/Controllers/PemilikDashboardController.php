@@ -20,7 +20,7 @@ class PemilikDashboardController extends Controller
         $today = Carbon::today($timezone);
         $todayDate = $today->toDateString();
 
-        // 1. Ringkasan Penjualan Hari Ini (berdasarkan pembayaran yang benar-benar terkonfirmasi Lunas)
+        // 1. Ringkasan Penjualan Hari Ini (berdasarkan pembayaran yang benar-benar terkonfirmasi Lunas di Asia/Jakarta)
         $pembayaranHariIni = Pembayaran::with(['penyewaan.pelanggan', 'penyewaan.detailPenyewaan.alat'])
             ->where('status_pembayaran', 'Lunas')
             ->where(function ($q) use ($todayDate) {
@@ -39,7 +39,7 @@ class PemilikDashboardController extends Controller
             return (float) ($p->total_biaya > 0 ? $p->total_biaya : ($p->penyewaan?->total_biaya ?? 0));
         });
 
-        // 2. Ringkasan Penjualan Bulan Berjalan (MTD berdasarkan pembayaran Lunas)
+        // 2. Ringkasan Penjualan Bulan Berjalan (MTD berdasarkan pembayaran Lunas di Asia/Jakarta)
         $startOfMonth = Carbon::now($timezone)->startOfMonth();
         $endOfMonth = Carbon::now($timezone)->endOfMonth();
         $startOfMonthDate = $startOfMonth->toDateString();
@@ -63,23 +63,76 @@ class PemilikDashboardController extends Controller
             return (float) ($p->total_biaya > 0 ? $p->total_biaya : ($p->penyewaan?->total_biaya ?? 0));
         });
 
-        // 3. Grafik Penjualan Harian (7 Hari Terakhir di Asia/Jakarta)
+        // 3. Konfigurasi Periode Filter Grafik Penjualan
+        $selectedPeriode = $request->query('periode', '7_hari');
+        $tanggalMulaiInput = $request->query('tanggal_mulai');
+        $tanggalSelesaiInput = $request->query('tanggal_selesai');
+
+        $chartTimeline = [];
+        $chartTitle = '📊 Grafik Penjualan Harian (7 Hari Terakhir)';
+        $chartSubtitle = 'Performa harian kas masuk & nilai pesanan (WIB)';
+
+        if ($selectedPeriode === '30_hari') {
+            $chartTitle = '📊 Grafik Penjualan Harian (30 Hari Terakhir)';
+            $chartSubtitle = 'Performa 30 hari kas masuk sah & volume pesanan (WIB)';
+            for ($i = 29; $i >= 0; $i--) {
+                $chartTimeline[] = Carbon::now($timezone)->subDays($i);
+            }
+        } elseif ($selectedPeriode === 'bulan_ini') {
+            $chartTitle = '📊 Grafik Penjualan Bulan Ini ('.Carbon::now($timezone)->translatedFormat('F Y').')';
+            $chartSubtitle = 'Akumulasi harian bulan berjalan (WIB)';
+            $daysInMonthSoFar = Carbon::now($timezone)->day;
+            for ($i = $daysInMonthSoFar - 1; $i >= 0; $i--) {
+                $chartTimeline[] = Carbon::now($timezone)->subDays($i);
+            }
+        } elseif ($selectedPeriode === 'kustom' && $request->filled(['tanggal_mulai', 'tanggal_selesai'])) {
+            $tglMulai = Carbon::parse($tanggalMulaiInput, $timezone)->startOfDay();
+            $tglSelesai = Carbon::parse($tanggalSelesaiInput, $timezone)->startOfDay();
+            if ($tglMulai->gt($tglSelesai)) {
+                $temp = $tglMulai;
+                $tglMulai = $tglSelesai;
+                $tglSelesai = $temp;
+            }
+            $diffDays = min(60, (int) $tglMulai->diffInDays($tglSelesai));
+            for ($i = 0; $i <= $diffDays; $i++) {
+                $chartTimeline[] = $tglMulai->copy()->addDays($i);
+            }
+            $chartTitle = '📊 Grafik Penjualan ('.$tglMulai->translatedFormat('d M Y').' — '.$tglSelesai->translatedFormat('d M Y').')';
+            $chartSubtitle = 'Rentang kustom terpilih (WIB)';
+        } else {
+            // Default: 7 Hari Terakhir
+            $selectedPeriode = '7_hari';
+            for ($i = 6; $i >= 0; $i--) {
+                $chartTimeline[] = Carbon::now($timezone)->subDays($i);
+            }
+        }
+
+        // Ambil data pembayaran lunas untuk periode timeline dengan 1 query optimal (mencegah relasi join multiplication)
+        $earliestDate = $chartTimeline[0]->toDateString();
+        $latestDate = end($chartTimeline)->toDateString();
+
+        $pembayaranPeriod = Pembayaran::query()
+            ->where('status_pembayaran', 'Lunas')
+            ->where(function ($q) use ($earliestDate, $latestDate) {
+                $q->whereBetween('waktu_konfirmasi', [$earliestDate.' 00:00:00', $latestDate.' 23:59:59'])
+                    ->orWhere(function ($sub) use ($earliestDate, $latestDate) {
+                        $sub->whereNull('waktu_konfirmasi')
+                            ->whereBetween('tanggal_pembayaran', [$earliestDate.' 00:00:00', $latestDate.' 23:59:59']);
+                    });
+            })
+            ->get();
+
+        $pembayaranByDay = $pembayaranPeriod->groupBy(function ($bayar) {
+            $time = $bayar->waktu_konfirmasi ?? $bayar->tanggal_pembayaran;
+
+            return Carbon::parse($time)->timezone('Asia/Jakarta')->toDateString();
+        });
+
         $grafikHarian = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $day = Carbon::now($timezone)->subDays($i);
+        foreach ($chartTimeline as $day) {
             $dayDate = $day->toDateString();
             $dayLabel = $day->translatedFormat('d M');
-
-            $pembayaranDay = Pembayaran::query()
-                ->where('status_pembayaran', 'Lunas')
-                ->where(function ($q) use ($dayDate) {
-                    $q->whereDate('waktu_konfirmasi', $dayDate)
-                        ->orWhere(function ($sub) use ($dayDate) {
-                            $sub->whereNull('waktu_konfirmasi')
-                                ->whereDate('tanggal_pembayaran', $dayDate);
-                        });
-                })
-                ->get();
+            $pembayaranDay = $pembayaranByDay->get($dayDate, collect());
 
             $grafikHarian[] = [
                 'tanggal' => $dayDate,
@@ -95,26 +148,35 @@ class PemilikDashboardController extends Controller
         $hasDailyChartData = collect($grafikHarian)->sum('total_transaksi') > 0 || collect($grafikHarian)->sum('uang_diterima') > 0;
 
         // 4. Grafik Tren Penjualan Bulanan (6 Bulan Terakhir di Asia/Jakarta)
+        $mStartQuery = Carbon::now($timezone)->subMonths(5)->startOfMonth()->toDateString();
+        $mEndQuery = Carbon::now($timezone)->endOfMonth()->toDateString();
+
+        $pembayaran6Bulan = Pembayaran::query()
+            ->where('status_pembayaran', 'Lunas')
+            ->where(function ($q) use ($mStartQuery, $mEndQuery) {
+                $q->whereBetween('waktu_konfirmasi', [$mStartQuery.' 00:00:00', $mEndQuery.' 23:59:59'])
+                    ->orWhere(function ($sub) use ($mStartQuery, $mEndQuery) {
+                        $sub->whereNull('waktu_konfirmasi')
+                            ->whereBetween('tanggal_pembayaran', [$mStartQuery.' 00:00:00', $mEndQuery.' 23:59:59']);
+                    });
+            })
+            ->get();
+
+        $pembayaranByMonth = $pembayaran6Bulan->groupBy(function ($bayar) {
+            $time = $bayar->waktu_konfirmasi ?? $bayar->tanggal_pembayaran;
+
+            return Carbon::parse($time)->timezone('Asia/Jakarta')->format('Y-m');
+        });
+
         $grafikBulanan = [];
         for ($i = 5; $i >= 0; $i--) {
             $month = Carbon::now($timezone)->subMonths($i);
-            $mStart = $month->copy()->startOfMonth()->toDateString();
-            $mEnd = $month->copy()->endOfMonth()->toDateString();
+            $monthKey = $month->format('Y-m');
             $mLabel = $month->translatedFormat('M Y');
-
-            $pembayaranMonth = Pembayaran::query()
-                ->where('status_pembayaran', 'Lunas')
-                ->where(function ($q) use ($mStart, $mEnd) {
-                    $q->whereBetween('waktu_konfirmasi', [$mStart.' 00:00:00', $mEnd.' 23:59:59'])
-                        ->orWhere(function ($sub) use ($mStart, $mEnd) {
-                            $sub->whereNull('waktu_konfirmasi')
-                                ->whereBetween('tanggal_pembayaran', [$mStart.' 00:00:00', $mEnd.' 23:59:59']);
-                        });
-                })
-                ->get();
+            $pembayaranMonth = $pembayaranByMonth->get($monthKey, collect());
 
             $grafikBulanan[] = [
-                'bulan' => $month->format('Y-m'),
+                'bulan' => $monthKey,
                 'label' => $mLabel,
                 'total_transaksi' => $pembayaranMonth->count(),
                 'uang_diterima' => (float) $pembayaranMonth->sum('jumlah_pembayaran'),
@@ -165,7 +227,7 @@ class PemilikDashboardController extends Controller
                 return $alat;
             });
 
-        // 7. Ringkasan Transaksi Pelanggan (Real Database, Read-Only)
+        // 7. Riwayat Pesanan Pelanggan (Real Database, Termasuk Sumber Online & On-site, Read-Only)
         $pesananList = Penyewaan::with(['pelanggan', 'pembayaran', 'detailPenyewaan.alat'])
             ->orderBy('tanggal_sewa', 'desc')
             ->get();
@@ -181,6 +243,11 @@ class PemilikDashboardController extends Controller
             'pendapatanBulanIni' => $pendapatanBulanIni,
             'nilaiPesananBulanIni' => $nilaiPesananBulanIni,
             'rincianBulanIni' => $pembayaranBulanIni,
+            'selectedPeriode' => $selectedPeriode,
+            'tanggalMulaiInput' => $tanggalMulaiInput,
+            'tanggalSelesaiInput' => $tanggalSelesaiInput,
+            'chartTitle' => $chartTitle,
+            'chartSubtitle' => $chartSubtitle,
             'grafikHarian' => $grafikHarian,
             'hasDailyChartData' => $hasDailyChartData,
             'grafikBulanan' => $grafikBulanan,

@@ -8,7 +8,9 @@ use App\Models\Pembayaran;
 use App\Models\Penyewaan;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class PemilikDashboardTest extends TestCase
@@ -426,5 +428,246 @@ class PemilikDashboardTest extends TestCase
         $this->actingAs($pemilik)
             ->post(route('pemilik.test-action'))
             ->assertStatus(403);
+    }
+
+    /**
+     * Uji filter periode grafik 30 hari dan rentang tanggal kustom
+     */
+    public function test_pemilik_can_filter_chart_period_30_days_and_custom_range(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $admin = User::where('username', 'admin')->first();
+        $pelanggan = Pelanggan::find(1);
+        $alat = Alat::find('ALT001');
+
+        $nowJakarta = Carbon::now('Asia/Jakarta');
+        $tenDaysAgo = Carbon::now('Asia/Jakarta')->subDays(10);
+
+        // Buat pembayaran lunas 10 hari yang lalu
+        $sewaOld = Penyewaan::create([
+            'no_transaksi' => 'TRX-10D-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => $tenDaysAgo->toDateString(),
+            'tanggal_kembali' => $tenDaysAgo->toDateString(),
+            'status_penyewaan' => 'Selesai',
+        ]);
+        $sewaOld->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 180000,
+        ]);
+        Pembayaran::create([
+            'no_pembayaran' => 'PAY-10D-001',
+            'no_transaksi' => 'TRX-10D-001',
+            'total_biaya' => 180000,
+            'jumlah_pembayaran' => 180000,
+            'metode_pembayaran' => 'Transfer Bank',
+            'tanggal_pembayaran' => $tenDaysAgo,
+            'status_pembayaran' => 'Lunas',
+            'id_admin' => $admin->id_user,
+            'waktu_konfirmasi' => $tenDaysAgo,
+        ]);
+
+        // 1. Filter periode 30 hari
+        $res30 = $this->actingAs($pemilik)->get(route('pemilik.dashboard', ['periode' => '30_hari']));
+        $res30->assertStatus(200);
+        $res30->assertSee('Grafik Penjualan Harian (30 Hari Terakhir)');
+        $res30->assertViewHas('grafikHarian', function ($harian) {
+            return count($harian) === 30;
+        });
+
+        // 2. Filter periode kustom
+        $startStr = $tenDaysAgo->copy()->subDay()->toDateString();
+        $endStr = $tenDaysAgo->copy()->addDay()->toDateString();
+
+        $resCustom = $this->actingAs($pemilik)->get(route('pemilik.dashboard', [
+            'periode' => 'kustom',
+            'tanggal_mulai' => $startStr,
+            'tanggal_selesai' => $endStr,
+        ]));
+        $resCustom->assertStatus(200);
+        $resCustom->assertViewHas('grafikHarian', function ($harian) {
+            // Rentang 3 hari (subDay, tenDaysAgo, addDay)
+            return count($harian) === 3;
+        });
+    }
+
+    /**
+     * Uji pemisahan nilai pesanan vs uang riil yang diterima dan penggunaan tarif historis
+     */
+    public function test_order_value_differs_from_actual_cash_received_and_uses_historical_rates(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $admin = User::where('username', 'admin')->first();
+        $pelanggan = Pelanggan::find(1);
+        $alat = Alat::find('ALT001');
+
+        $nowJakarta = Carbon::now('Asia/Jakarta');
+        $todayStr = $nowJakarta->toDateString();
+
+        // Ubah tarif master saat ini untuk menguji bahwa perhitungan menggunakan tarif historis
+        $originalPrice = $alat->tarif_sewa_per_hari;
+        $alat->update(['tarif_sewa' => 999999]);
+
+        // 1. Pesanan lunas dengan tarif historis Rp 120.000 (disimpan pada transaksi)
+        $sewaLunas = Penyewaan::create([
+            'no_transaksi' => 'TRX-HIST-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => $todayStr,
+            'tanggal_kembali' => $todayStr,
+            'status_penyewaan' => 'Disetujui',
+        ]);
+        $sewaLunas->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 120000,
+        ]);
+        Pembayaran::create([
+            'no_pembayaran' => 'PAY-HIST-001',
+            'no_transaksi' => 'TRX-HIST-001',
+            'total_biaya' => 120000,
+            'jumlah_pembayaran' => 120000,
+            'metode_pembayaran' => 'Cash',
+            'tanggal_pembayaran' => $nowJakarta,
+            'status_pembayaran' => 'Lunas',
+            'id_admin' => $admin->id_user,
+            'waktu_konfirmasi' => $nowJakarta,
+        ]);
+
+        // 2. Pesanan hari ini yang BELUM bayar (total nilai pesanan Rp 300.000)
+        // Nilai ini adalah nilai pesanan, namun TIDAK BOLEH masuk ke kas diterima (Rp 120.000)
+        $sewaUnpaid = Penyewaan::create([
+            'no_transaksi' => 'TRX-UNPAID-002',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => $todayStr,
+            'tanggal_kembali' => $todayStr,
+            'status_penyewaan' => 'Menunggu Pembayaran',
+        ]);
+        $sewaUnpaid->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 300000,
+        ]);
+        Pembayaran::create([
+            'no_pembayaran' => 'PAY-UNPAID-002',
+            'no_transaksi' => 'TRX-UNPAID-002',
+            'total_biaya' => 300000,
+            'jumlah_pembayaran' => 0,
+            'metode_pembayaran' => 'Transfer Bank',
+            'tanggal_pembayaran' => $nowJakarta,
+            'status_pembayaran' => 'Belum Lunas',
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+
+        // Uang diterima hanya Rp 120.000 (bukan 999.999 dan bukan ditambah 300.000)
+        $response->assertSee('id="valPendapatanHariIni" style="font-size:1.45rem;">Rp 120.000<', false);
+        // Pesanan belum bayar TIDAK masuk ke pendapatan lunas
+        $response->assertDontSee('Rp 420.000');
+        $response->assertDontSee('Rp 999.999');
+    }
+
+    /**
+     * Uji tabel riwayat pesanan menampilkan label sumber Online dan On-site beserta tombol rincian
+     */
+    public function test_customer_orders_history_table_displays_online_and_onsite_sources_with_detail_link(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $pelanggan = Pelanggan::find(1);
+        $alat = Alat::find('ALT001');
+
+        // 1. Pesanan Online
+        $sewaOnline = Penyewaan::create([
+            'no_transaksi' => 'TRX-SRC-ONL-01',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => 3,
+            'tanggal_sewa' => '2026-10-17',
+            'tanggal_kembali' => '2026-10-18',
+            'status_penyewaan' => 'Disetujui',
+            'sumber_pesanan' => 'online',
+        ]);
+        $sewaOnline->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 1,
+            'tarif_sewa' => 50000,
+        ]);
+
+        // 2. Pesanan On-site (Tablet Kios Kasir)
+        $sewaOnsite = Penyewaan::create([
+            'no_transaksi' => 'TRX-SRC-ONS-02',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'id_user' => null,
+            'tanggal_sewa' => '2026-10-17',
+            'tanggal_kembali' => '2026-10-18',
+            'status_penyewaan' => 'Disetujui',
+            'sumber_pesanan' => 'on-site',
+        ]);
+        $sewaOnsite->detailPenyewaan()->create([
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 2,
+            'tarif_sewa' => 50000,
+        ]);
+
+        $response = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('TRX-SRC-ONL-01');
+        $response->assertSee('TRX-SRC-ONS-02');
+        $response->assertSee('Online');
+        $response->assertSee('On-site');
+        // Tautan rincian transaksi menuju ke show Pemilik
+        $response->assertSee(route('pemilik.transaksi.show', 'TRX-SRC-ONL-01'));
+        $response->assertSee(route('pemilik.transaksi.show', 'TRX-SRC-ONS-02'));
+    }
+
+    /**
+     * Uji pembatasan akses: Pemilik dilarang mengakses rute pengelolaan operasional Admin (403)
+     */
+    public function test_pemilik_cannot_access_admin_operational_routes(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        // 1. Rute kelola alat
+        $this->actingAs($pemilik)->get('/admin/alat')->assertStatus(403);
+        $this->actingAs($pemilik)->get('/admin/alat/tambah')->assertStatus(403);
+
+        // 2. Rute kelola pesanan dan pembayaran
+        $this->actingAs($pemilik)->get('/admin/pembayaran')->assertStatus(403);
+        $this->actingAs($pemilik)->post('/admin/pembayaran/PAY-001/konfirmasi', [])->assertStatus(403);
+
+        // 3. Rute manajemen pengguna
+        $this->actingAs($pemilik)->get('/admin/users')->assertStatus(403);
+        $this->actingAs($pemilik)->post('/admin/users', [])->assertStatus(403);
+
+        // 4. Rute penyesuaian stok inventaris
+        $this->actingAs($pemilik)->post('/admin/inventaris/ALT001/adjust', ['stok_baru' => 10])->assertStatus(403);
+    }
+
+    /**
+     * Uji penanganan ramah saat terjadi kegagalan koneksi database pada dashboard Pemilik
+     */
+    public function test_pemilik_dashboard_database_connection_failure_renders_friendly_error_page(): void
+    {
+        Route::get('/pemilik/test-db-connection-failure', function () {
+            throw new QueryException(
+                'mysql',
+                'SELECT * FROM pembayaran',
+                [],
+                new \Exception('SQLSTATE[HY000] [2002] Connection refused to 127.0.0.1:3306', 2002)
+            );
+        });
+
+        $pemilik = User::where('username', 'pemilik')->first();
+
+        $response = $this->actingAs($pemilik)->get('/pemilik/test-db-connection-failure');
+
+        $response->assertStatus(503);
+        $response->assertSee('ERR_DB_CONN');
+        $response->assertSee('Layanan Database Tidak Tersedia');
     }
 }

@@ -10,7 +10,7 @@
         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
     </svg>
     <div class="small">
-        <strong>Hak Akses Pemilik (Strictly Read-Only):</strong> Halaman ini ditujukan untuk pemantauan performa bisnis, pendapatan terkonfirmasi, dan status inventaris. Seluruh fungsi perubahan data dinonaktifkan.
+        <strong>Hak Akses Pemilik (Strictly Read-Only):</strong> Halaman ini ditujukan untuk pemantauan performa bisnis, penerimaan kas nyata terkonfirmasi, dan status inventaris. Seluruh fungsi perubahan data dinonaktifkan.
     </div>
 </div>
 
@@ -137,6 +137,7 @@
                                 <tr>
                                     <th>No. Pembayaran</th>
                                     <th>No. Transaksi</th>
+                                    <th>Sumber</th>
                                     <th>Pelanggan</th>
                                     <th>Metode</th>
                                     <th>Waktu Konfirmasi</th>
@@ -149,6 +150,13 @@
                                     <tr>
                                         <td><code>{{ $bayar->no_pembayaran }}</code></td>
                                         <td><strong>{{ $bayar->no_transaksi }}</strong></td>
+                                        <td>
+                                            @if($bayar->penyewaan?->isOnsite())
+                                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="font-size:0.7rem;">📱 On-site</span>
+                                            @else
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.7rem;">🌐 Online</span>
+                                            @endif
+                                        </td>
                                         <td>{{ $bayar->penyewaan?->pelanggan?->nama_pelanggan ?? 'Umum' }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ $bayar->metode_pembayaran }}</span></td>
                                         <td><small class="text-muted">{{ $bayar->waktu_konfirmasi ? \Carbon\Carbon::parse($bayar->waktu_konfirmasi)->timezone('Asia/Jakarta')->format('H:i:s') . ' WIB' : '-' }}</small></td>
@@ -204,6 +212,7 @@
                                 <tr>
                                     <th>No. Pembayaran</th>
                                     <th>No. Transaksi</th>
+                                    <th>Sumber</th>
                                     <th>Pelanggan</th>
                                     <th>Metode</th>
                                     <th>Waktu Konfirmasi</th>
@@ -216,6 +225,13 @@
                                     <tr>
                                         <td><code>{{ $bayar->no_pembayaran }}</code></td>
                                         <td><strong>{{ $bayar->no_transaksi }}</strong></td>
+                                        <td>
+                                            @if($bayar->penyewaan?->isOnsite())
+                                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="font-size:0.7rem;">📱 On-site</span>
+                                            @else
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.7rem;">🌐 Online</span>
+                                            @endif
+                                        </td>
                                         <td>{{ $bayar->penyewaan?->pelanggan?->nama_pelanggan ?? 'Umum' }}</td>
                                         <td><span class="badge bg-light text-dark border">{{ $bayar->metode_pembayaran }}</span></td>
                                         <td><small class="text-muted">{{ $bayar->waktu_konfirmasi ? \Carbon\Carbon::parse($bayar->waktu_konfirmasi)->timezone('Asia/Jakarta')->format('d M H:i') . ' WIB' : '-' }}</small></td>
@@ -237,21 +253,39 @@
 
 <!-- 2 Visual Sales Charts -->
 <div class="row g-4 mb-4">
-    <!-- Grafik Penjualan Harian -->
+    <!-- Grafik Penjualan Harian / Sesuai Periode Pilihan -->
     <div class="col-12 col-lg-6">
         <div class="ac-card h-100 shadow-sm border-0" style="border-radius:12px;">
-            <div class="ac-card-header d-flex justify-content-between align-items-center bg-white border-bottom py-3 px-4">
+            <div class="ac-card-header d-flex justify-content-between align-items-center bg-white border-bottom py-3 px-4 flex-wrap gap-2">
                 <div>
-                    <h3 class="ac-card-title fs-6 fw-bold mb-0 text-dark">📊 Grafik Penjualan Harian (7 Hari Terakhir)</h3>
-                    <small class="text-muted">Performa harian kas masuk & nilai pesanan (WIB)</small>
+                    <h3 class="ac-card-title fs-6 fw-bold mb-0 text-dark">{{ $chartTitle }}</h3>
+                    <small class="text-muted">{{ $chartSubtitle }}</small>
                 </div>
-                <span class="badge bg-light text-dark border">Harian</span>
+                <!-- Filter Periode Grafik -->
+                <form action="{{ route('pemilik.dashboard') }}" method="GET" class="d-flex align-items-center flex-wrap gap-1" id="formFilterChart">
+                    <select name="periode" id="selectPeriode" class="form-select form-select-sm" style="width: auto;" onchange="handlePeriodeChange(this.value)">
+                        <option value="7_hari" {{ ($selectedPeriode ?? '7_hari') === '7_hari' ? 'selected' : '' }}>7 Hari</option>
+                        <option value="30_hari" {{ ($selectedPeriode ?? '') === '30_hari' ? 'selected' : '' }}>30 Hari</option>
+                        <option value="bulan_ini" {{ ($selectedPeriode ?? '') === 'bulan_ini' ? 'selected' : '' }}>Bulan Ini</option>
+                        <option value="kustom" {{ ($selectedPeriode ?? '') === 'kustom' ? 'selected' : '' }}>Kustom</option>
+                    </select>
+
+                    <div id="customDateInputs" class="d-flex align-items-center gap-1 {{ ($selectedPeriode ?? '') === 'kustom' ? '' : 'd-none' }}">
+                        <input type="date" name="tanggal_mulai" class="form-control form-control-sm" value="{{ $tanggalMulaiInput ?? '' }}" style="width: 120px;">
+                        <input type="date" name="tanggal_selesai" class="form-control form-control-sm" value="{{ $tanggalSelesaiInput ?? '' }}" style="width: 120px;">
+                        <button type="submit" class="btn btn-sm btn-primary py-1 px-2" style="font-size: 0.75rem;">Pilih</button>
+                    </div>
+
+                    @if(($selectedPeriode ?? '7_hari') !== '7_hari')
+                        <a href="{{ route('pemilik.dashboard') }}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.75rem;" title="Reset ke Default">&times;</a>
+                    @endif
+                </form>
             </div>
             <div class="ac-card-body p-4">
                 @if(! $hasDailyChartData)
                     <div class="p-4 text-center text-muted my-3" id="emptyDailyChart">
                         <div class="mb-2" style="font-size: 2.2rem;">📊</div>
-                        <h6 class="fw-bold text-secondary">Belum Ada Transaksi Penjualan 7 Hari Terakhir</h6>
+                        <h6 class="fw-bold text-secondary">Belum Ada Transaksi Penjualan {{ ($selectedPeriode ?? '7_hari') === '7_hari' ? '7 Hari Terakhir' : 'pada Periode Ini' }}</h6>
                         <p class="small text-muted mb-0">Grafik akan terisi secara otomatis begitu pembayaran sewa dikonfirmasi lunas.</p>
                     </div>
                 @else
@@ -291,7 +325,7 @@
 </div>
 
 <!-- Riwayat Pesanan Pelanggan (Read-Only) -->
-<x-data-table title="Riwayat Pesanan Pelanggan (Pengawasan Pemilik)" subtitle="Pantau aktivitas penyewaan dan pembayaran pelanggan secara transparan" searchId="searchOwnerOrders">
+<x-data-table title="Riwayat Pesanan Pelanggan (Pengawasan Pemilik)" subtitle="Pantau aktivitas penyewaan dan pembayaran pelanggan secara transparan (Sumber Online & On-site)" searchId="searchOwnerOrders">
     <x-slot:actions>
         <span class="badge bg-secondary" style="font-size:0.75rem;">Mode Read-Only</span>
     </x-slot:actions>
@@ -299,6 +333,7 @@
     <thead>
         <tr>
             <th>No. Transaksi</th>
+            <th>Sumber</th>
             <th>Nama Pelanggan</th>
             <th>Tanggal Sewa</th>
             <th>Durasi</th>
@@ -306,12 +341,24 @@
             <th>Metode Pembayaran</th>
             <th>Status Pembayaran</th>
             <th>Status Pesanan</th>
+            <th class="text-center">Rincian</th>
         </tr>
     </thead>
     <tbody>
         @forelse($pesananList as $trx)
             <tr>
                 <td><strong>{{ $trx->no_transaksi }}</strong></td>
+                <td>
+                    @if($trx->isOnsite())
+                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle d-inline-flex align-items-center gap-1" style="font-size:0.75rem;">
+                            <span>📱</span> On-site
+                        </span>
+                    @else
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle d-inline-flex align-items-center gap-1" style="font-size:0.75rem;">
+                            <span>🌐</span> Online
+                        </span>
+                    @endif
+                </td>
                 <td>{{ $trx->pelanggan?->nama_pelanggan ?? 'Pelanggan' }}</td>
                 <td>{{ $trx->tanggal_sewa ? \Carbon\Carbon::parse($trx->tanggal_sewa)->format('d M Y') : '-' }}</td>
                 <td>{{ $trx->durasi_hari }} hari</td>
@@ -325,10 +372,15 @@
                 <td>
                     <x-status-badge :status="$trx->status_penyewaan" />
                 </td>
+                <td class="text-center">
+                    <a href="{{ route('pemilik.transaksi.show', $trx->no_transaksi) }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;" title="Lihat Detail Transaksi">
+                        🔍 Rincian
+                    </a>
+                </td>
             </tr>
         @empty
             <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
+                <td colspan="10" class="text-center py-4 text-muted">
                     Belum ada riwayat transaksi penyewaan pelanggan yang tercatat di sistem.
                 </td>
             </tr>
@@ -460,6 +512,16 @@
 @push('scripts')
 <script src="{{ asset('vendor/chartjs/chart.umd.min.js') }}"></script>
 <script>
+function handlePeriodeChange(val) {
+    const customDiv = document.getElementById('customDateInputs');
+    if (val === 'kustom') {
+        if (customDiv) customDiv.classList.remove('d-none');
+    } else {
+        if (customDiv) customDiv.classList.add('d-none');
+        document.getElementById('formFilterChart').submit();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     @if($hasDailyChartData)
     const ctxHarian = document.getElementById('chartPenjualanHarian');
