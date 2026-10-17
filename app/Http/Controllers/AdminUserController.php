@@ -16,11 +16,28 @@ use Illuminate\View\View;
 class AdminUserController extends Controller
 {
     /**
+     * Periksa apakah user merupakan administrator aktif terakhir di sistem
+     */
+    public function isLastActiveAdmin(User $user): bool
+    {
+        if (! $user->isAdmin() || ! $user->isActive()) {
+            return false;
+        }
+
+        $otherActiveAdmins = User::where('role', 'Admin')
+            ->where('status_aktif', 1)
+            ->where('id_user', '!=', $user->id_user)
+            ->count();
+
+        return $otherActiveAdmins === 0;
+    }
+
+    /**
      * Tampilkan daftar akun pengguna sistem
      */
     public function index(Request $request): View
     {
-        $query = User::query()->with('pelanggan');
+        $query = User::query()->with(['pelanggan.penyewaan']);
 
         // Filter pencarian berdasarkan nama user atau username
         if ($request->filled('q')) {
@@ -57,6 +74,10 @@ class AdminUserController extends Controller
         $totalPengguna = User::whereIn('role', ['Pengguna', 'Pelanggan'])->count();
         $totalAktif = User::where('status_aktif', 1)->count();
         $totalNonaktif = User::where('status_aktif', 0)->count();
+        $activeAdminCount = User::where('role', 'Admin')->where('status_aktif', 1)->count();
+
+        // Pelanggan on-site yang belum memiliki akun login
+        $totalPelangganTanpaAkun = Pelanggan::whereDoesntHave('user')->count();
 
         return view('admin.users.index', [
             'users' => $users,
@@ -69,6 +90,8 @@ class AdminUserController extends Controller
             'totalPengguna' => $totalPengguna,
             'totalAktif' => $totalAktif,
             'totalNonaktif' => $totalNonaktif,
+            'activeAdminCount' => $activeAdminCount,
+            'totalPelangganTanpaAkun' => $totalPelangganTanpaAkun,
         ]);
     }
 
@@ -77,7 +100,14 @@ class AdminUserController extends Controller
      */
     public function create(): View
     {
-        return view('admin.users.create');
+        // Ambil daftar pelanggan on-site (toko) yang belum memiliki akun user
+        $pelangganOnsite = Pelanggan::whereDoesntHave('user')
+            ->orderBy('nama_pelanggan', 'asc')
+            ->get();
+
+        return view('admin.users.create', [
+            'pelangganOnsite' => $pelangganOnsite,
+        ]);
     }
 
     /**
@@ -98,6 +128,9 @@ class AdminUserController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'in:Admin,Pemilik,Pengguna'],
             'status_aktif' => ['required', 'in:0,1'],
+            'id_pelanggan_onsite' => ['nullable', 'integer', 'exists:pelanggan,id_pelanggan'],
+            'nomor_telepon' => ['nullable', 'string', 'max:20'],
+            'alamat' => ['nullable', 'string', 'max:255'],
         ], [
             'nama_user.required' => 'Nama lengkap pengguna wajib diisi.',
             'username.required' => 'Username wajib diisi.',
@@ -110,20 +143,38 @@ class AdminUserController extends Controller
             'role.required' => 'Peran akun wajib dipilih.',
             'role.in' => 'Pilihan peran akun tidak valid.',
             'status_aktif.required' => 'Status keaktifan akun wajib dipilih.',
+            'id_pelanggan_onsite.exists' => 'Data pelanggan on-site yang dipilih tidak ditemukan.',
         ]);
 
         $user = DB::transaction(function () use ($validated) {
             $idPelanggan = null;
 
-            // Jika peran Pengguna, pastikan terhubung dengan profil pelanggan
+            // Jika peran Pengguna, hubungkan dengan profil pelanggan
             if ($validated['role'] === 'Pengguna') {
-                $pelanggan = Pelanggan::create([
-                    'nama_pelanggan' => $validated['nama_user'],
-                    'alamat' => 'Alamat belum disetel',
-                    'nomor_telepon' => '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_RIGHT),
-                    'created_at' => now(),
-                ]);
-                $idPelanggan = $pelanggan->id_pelanggan;
+                if (! empty($validated['id_pelanggan_onsite'])) {
+                    $idPelanggan = (int) $validated['id_pelanggan_onsite'];
+                } else {
+                    $phone = ! empty($validated['nomor_telepon'])
+                        ? trim((string) $validated['nomor_telepon'])
+                        : '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_RIGHT);
+
+                    $alamat = ! empty($validated['alamat'])
+                        ? trim((string) $validated['alamat'])
+                        : 'Alamat belum disetel';
+
+                    $existingPelanggan = Pelanggan::findByPhone($phone);
+                    if ($existingPelanggan && ! $existingPelanggan->user()->exists()) {
+                        $idPelanggan = $existingPelanggan->id_pelanggan;
+                    } else {
+                        $pelanggan = Pelanggan::create([
+                            'nama_pelanggan' => $validated['nama_user'],
+                            'alamat' => $alamat,
+                            'nomor_telepon' => $phone,
+                            'created_at' => now(),
+                        ]);
+                        $idPelanggan = $pelanggan->id_pelanggan;
+                    }
+                }
             }
 
             return User::create([
@@ -155,7 +206,13 @@ class AdminUserController extends Controller
      */
     public function edit(User $user): View
     {
-        return view('admin.users.edit', compact('user'));
+        $user->load('pelanggan');
+        $isLastAdmin = $this->isLastActiveAdmin($user);
+
+        return view('admin.users.edit', [
+            'user' => $user,
+            'isLastAdmin' => $isLastAdmin,
+        ]);
     }
 
     /**
@@ -176,6 +233,8 @@ class AdminUserController extends Controller
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'in:Admin,Pemilik,Pengguna'],
             'status_aktif' => ['required', 'in:0,1'],
+            'nomor_telepon' => ['nullable', 'string', 'max:20'],
+            'alamat' => ['nullable', 'string', 'max:255'],
         ], [
             'nama_user.required' => 'Nama lengkap pengguna wajib diisi.',
             'username.required' => 'Username wajib diisi.',
@@ -204,6 +263,21 @@ class AdminUserController extends Controller
             }
         }
 
+        // Keamanan: Cegah mengubah role atau menonaktifkan Admin aktif terakhir
+        if ($this->isLastActiveAdmin($user)) {
+            if ($validated['role'] !== 'Admin') {
+                return back()->withInput()->withErrors([
+                    'role' => 'Akun ini adalah administrator aktif terakhir di sistem. Perannya tidak dapat diubah agar sistem tetap dapat dikelola.',
+                ]);
+            }
+
+            if ((int) $validated['status_aktif'] !== 1) {
+                return back()->withInput()->withErrors([
+                    'status_aktif' => 'Akun ini adalah administrator aktif terakhir di sistem. Akun tidak dapat dinonaktifkan agar sistem tetap dapat dikelola.',
+                ]);
+            }
+        }
+
         $oldRole = $user->role;
         $oldStatus = $user->status_aktif;
         $passwordChanged = false;
@@ -214,15 +288,38 @@ class AdminUserController extends Controller
             $user->role = $validated['role'];
             $user->status_aktif = (int) $validated['status_aktif'];
 
-            // Jika peran diubah menjadi Pengguna dan belum memiliki tautan pelanggan
-            if ($validated['role'] === 'Pengguna' && empty($user->id_pelanggan)) {
-                $pelanggan = Pelanggan::create([
-                    'nama_pelanggan' => $validated['nama_user'],
-                    'alamat' => 'Alamat belum disetel',
-                    'nomor_telepon' => '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_RIGHT),
-                    'created_at' => now(),
-                ]);
-                $user->id_pelanggan = $pelanggan->id_pelanggan;
+            // Jika peran adalah Pengguna
+            if ($validated['role'] === 'Pengguna') {
+                if (empty($user->id_pelanggan)) {
+                    $phone = ! empty($validated['nomor_telepon'])
+                        ? trim((string) $validated['nomor_telepon'])
+                        : '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_RIGHT);
+
+                    $alamat = ! empty($validated['alamat'])
+                        ? trim((string) $validated['alamat'])
+                        : 'Alamat belum disetel';
+
+                    $pelanggan = Pelanggan::create([
+                        'nama_pelanggan' => $validated['nama_user'],
+                        'alamat' => $alamat,
+                        'nomor_telepon' => $phone,
+                        'created_at' => now(),
+                    ]);
+                    $user->id_pelanggan = $pelanggan->id_pelanggan;
+                } else {
+                    // Perbarui profil pelanggan jika terhubung
+                    $pelanggan = $user->pelanggan;
+                    if ($pelanggan) {
+                        $pelanggan->nama_pelanggan = $validated['nama_user'];
+                        if (! empty($validated['nomor_telepon'])) {
+                            $pelanggan->nomor_telepon = trim((string) $validated['nomor_telepon']);
+                        }
+                        if (! empty($validated['alamat'])) {
+                            $pelanggan->alamat = trim((string) $validated['alamat']);
+                        }
+                        $pelanggan->save();
+                    }
+                }
             }
 
             // Atur ulang password jika diisi
@@ -270,6 +367,11 @@ class AdminUserController extends Controller
             return back()->with('error', 'Anda tidak dapat menonaktifkan akun administrator Anda sendiri.');
         }
 
+        // Keamanan: Cegah menonaktifkan admin aktif terakhir
+        if ($user->isActive() && $this->isLastActiveAdmin($user)) {
+            return back()->with('error', 'Tidak dapat menonaktifkan administrator terakhir. Sistem harus memiliki setidaknya satu administrator aktif untuk mengelola aplikasi.');
+        }
+
         $newStatus = $user->status_aktif ? 0 : 1;
         $user->status_aktif = $newStatus;
         $user->save();
@@ -287,6 +389,32 @@ class AdminUserController extends Controller
     }
 
     /**
+     * Atur ulang (reset) password akun pengguna secara langsung menggunakan hashing Laravel
+     */
+    public function resetPassword(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'password.required' => 'Password baru wajib diisi.',
+            'password.min' => 'Password baru minimal terdiri dari 8 karakter.',
+            'password.confirmed' => 'Konfirmasi password baru tidak cocok.',
+        ]);
+
+        $user->password = Hash::make($validated['password']);
+        $user->save();
+
+        ActivityLog::record(
+            Auth::id() ?? 1,
+            'Reset Password Pengguna',
+            'User',
+            "Mereset password akun [{$user->username}] ({$user->nama_user})"
+        );
+
+        return back()->with('success', "Password akun [{$user->username}] berhasil direset.");
+    }
+
+    /**
      * Nonaktifkan akun tanpa menghapus data historis transaksi
      */
     public function destroy(User $user): RedirectResponse
@@ -294,6 +422,11 @@ class AdminUserController extends Controller
         // Keamanan: Cegah Admin menonaktifkan akun sendiri
         if ((int) $user->id_user === (int) Auth::id()) {
             return back()->with('error', 'Anda tidak dapat menonaktifkan akun administrator Anda sendiri.');
+        }
+
+        // Keamanan: Cegah menonaktifkan admin aktif terakhir
+        if ($user->isActive() && $this->isLastActiveAdmin($user)) {
+            return back()->with('error', 'Tidak dapat menonaktifkan administrator terakhir. Sistem harus memiliki setidaknya satu administrator aktif untuk mengelola aplikasi.');
         }
 
         // Kebijakan Integritas: Akun tidak dihapus permanen melainkan dinonaktifkan

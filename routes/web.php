@@ -97,6 +97,7 @@ Route::middleware(['auth', 'role:Admin'])
 
         // Manajemen Pengguna (Admin Only)
         Route::patch('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::post('/users/{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('users.reset-password');
         Route::resource('users', AdminUserController::class)->parameters(['users' => 'user'])->except(['show']);
     });
 

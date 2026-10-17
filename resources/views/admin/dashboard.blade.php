@@ -399,7 +399,7 @@
 
 <div class="row g-3">
     <!-- Info Inventaris Cepat -->
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-4">
         <div class="ac-card h-100">
             <div class="ac-card-header">
                 <h3 class="ac-card-title">Kondisi Alat Camping</h3>
@@ -407,22 +407,22 @@
             <div class="ac-card-body">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
-                        <strong>Siap Disewa (Kondisi Baik)</strong>
-                        <small class="text-muted d-block">Stok dapat dipesan pelanggan</small>
+                        <strong>Siap Disewa (Baik)</strong>
+                        <small class="text-muted d-block">Stok dapat dipesan</small>
                     </div>
                     <span class="badge bg-success" style="font-size:0.9rem;">{{ $stokKondisiBaik ?? 0 }} Unit</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <div>
                         <strong>Perlu Perbaikan</strong>
-                        <small class="text-muted d-block">Pengecekan ritsleting & frame tenda</small>
+                        <small class="text-muted d-block">Menunggu konfirmasi servis</small>
                     </div>
                     <span class="badge bg-warning text-dark" style="font-size:0.9rem;">{{ $stokPerluPerbaikan ?? 0 }} Unit</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <div>
                         <strong>Rusak / Afkir</strong>
-                        <small class="text-muted d-block">Tidak boleh dihitung sebagai stok sewa</small>
+                        <small class="text-muted d-block">Terisolasi dari stok sewa</small>
                     </div>
                     <span class="badge bg-danger" style="font-size:0.9rem;">{{ $stokRusak ?? 0 }} Unit</span>
                 </div>
@@ -430,19 +430,53 @@
         </div>
     </div>
 
+    <!-- Modul Manajemen Pengguna -->
+    <div class="col-12 col-lg-4">
+        <div class="ac-card h-100">
+            <div class="ac-card-header d-flex justify-content-between align-items-center">
+                <h3 class="ac-card-title">Manajemen Pengguna</h3>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Admin Only</span>
+            </div>
+            <div class="ac-card-body">
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <strong>Total Akun Terdaftar</strong>
+                        <small class="text-muted d-block">Akun login aplikasi sistem</small>
+                    </div>
+                    <span class="badge bg-primary" style="font-size:0.9rem;">{{ $totalUsers ?? 0 }} Akun</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <strong>Akun Aktif</strong>
+                        <small class="text-muted d-block">Dapat login dan bertransaksi</small>
+                    </div>
+                    <span class="badge bg-success" style="font-size:0.9rem;">{{ $totalAktifUsers ?? 0 }} Aktif</span>
+                </div>
+                <div class="d-flex gap-2 mt-3 pt-1">
+                    <a href="{{ route('admin.users.index') }}" class="btn btn-outline-primary btn-sm flex-grow-1 shadow-sm">
+                        👥 Kelola Akun
+                    </a>
+                    <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm shadow-sm" title="Tambah Akun Baru">
+                        ➕ Tambah
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Catatan Pedoman Operasional -->
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-4">
         <div class="ac-card h-100">
             <div class="ac-card-header">
                 <h3 class="ac-card-title">Pedoman Operasional Admin</h3>
             </div>
             <div class="ac-card-body">
-                <ul class="mb-0 ps-3 small text-muted" style="line-height: 1.7;">
+                <ul class="mb-0 ps-3 small text-muted" style="line-height: 1.6;">
                     <li>Pemeriksaan stok harus dilakukan ulang sebelum menyetujui pesanan online maupun on-site.</li>
-                    <li>Jangan menyetujui pesanan jika stok periode tersebut tidak mencukupi.</li>
-                    <li>Status disetujui <strong>bukan berarti</strong> pembayaran lunas (status pesanan dan pembayaran terpisah).</li>
-                    <li>Pembayaran via transfer hanya ditandai lunas setelah bukti transfer divalidasi.</li>
-                    <li>Alat rusak wajib dicatat pada saat pengembalian dan tidak dikembalikan ke stok siap sewa.</li>
+                    <li>Status disetujui <strong>bukan berarti</strong> pembayaran lunas.</li>
+                    <li>Pembayaran transfer hanya lunas setelah bukti transfer divalidasi.</li>
+                    <li>Alat rusak wajib dicatat saat pengembalian dan tidak masuk stok siap sewa.</li>
+                    <li>Pengelolaan akun pengguna dan reset password hanya dapat dilakukan oleh Admin.</li>
                 </ul>
             </div>
         </div>

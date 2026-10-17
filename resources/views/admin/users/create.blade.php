@@ -70,15 +70,48 @@
                     <!-- Peran Akun (Role) -->
                     <div class="mb-3">
                         <label for="role" class="form-label small fw-bold text-dark">Peran Hak Akses (Role) <span class="text-danger">*</span></label>
-                        <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required>
+                        <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required onchange="toggleCustomerFields(this.value)">
                             <option value="">-- Pilih Peran Akun --</option>
                             <option value="Admin" {{ old('role') === 'Admin' ? 'selected' : '' }}>Admin (Pengelolaan operasional penuh & inventaris)</option>
-                            <option value="Pemilik" {{ old('role') === 'Pemilik' ? 'selected' : '' }}>Pemilik (Strictly Read-Only laporan keuangan & inventaris)</option>
+                            <option value="Pemilik" {{ old('role') === 'Pemilik' ? 'selected' : '' }}>Pemilik (Strictly Read-Only monitoring & laporan)</option>
                             <option value="Pengguna" {{ old('role', 'Pengguna') === 'Pengguna' ? 'selected' : '' }}>Pengguna / Penyewa (Akses katalog & pemesanan alat)</option>
                         </select>
                         @error('role')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+                    </div>
+
+                    <!-- Bagian Identitas Pelanggan Khusus Role Pengguna -->
+                    <div id="section-pelanggan" class="p-3 bg-light rounded border mb-3 {{ old('role', 'Pengguna') === 'Pengguna' ? '' : 'd-none' }}">
+                        <h4 class="h6 font-weight-bold text-dark mb-2">⛺ Hubungkan Data Profil Pelanggan</h4>
+                        <p class="small text-muted mb-3">
+                            Pelanggan on-site toko tidak otomatis dibuatkan akun login. Jika ingin membuatkan akun untuk pelanggan on-site yang sudah terdaftar, Anda dapat memilihnya di bawah ini atau mengisi kontak baru.
+                        </p>
+
+                        @if(isset($pelangganOnsite) && $pelangganOnsite->isNotEmpty())
+                            <div class="mb-3">
+                                <label for="id_pelanggan_onsite" class="form-label small fw-bold text-dark">Pilih Pelanggan Toko Terdaftar (Opsional)</label>
+                                <select name="id_pelanggan_onsite" id="id_pelanggan_onsite" class="form-select form-select-sm">
+                                    <option value="">-- Buat Profil Baru (Atau isi form kontak di bawah) --</option>
+                                    @foreach($pelangganOnsite as $p)
+                                        <option value="{{ $p->id_pelanggan }}" {{ old('id_pelanggan_onsite') == $p->id_pelanggan ? 'selected' : '' }}>
+                                            {{ $p->nama_pelanggan }} — {{ $p->nomor_telepon }} ({{ Str::limit($p->alamat, 35) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <label for="nomor_telepon" class="form-label small fw-bold text-dark">Nomor Telepon</label>
+                                <input type="text" name="nomor_telepon" id="nomor_telepon" class="form-control form-control-sm font-monospace" value="{{ old('nomor_telepon') }}" placeholder="Contoh: 081234567890">
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="alamat" class="form-label small fw-bold text-dark">Alamat Domisili</label>
+                                <input type="text" name="alamat" id="alamat" class="form-control form-control-sm" value="{{ old('alamat') }}" placeholder="Contoh: Jl. Merdeka No. 12, Bandung">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Status Keaktifan Akun -->
@@ -145,4 +178,16 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleCustomerFields(role) {
+    const sec = document.getElementById('section-pelanggan');
+    if (!sec) return;
+    if (role === 'Pengguna') {
+        sec.classList.remove('d-none');
+    } else {
+        sec.classList.add('d-none');
+    }
+}
+</script>
 @endsection

@@ -25,7 +25,7 @@
     </div>
 </div>
 
-<!-- 4 Kartu Metrik Ringkasan Akun -->
+<!-- Kartu Metrik Ringkasan Akun -->
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
         <div class="ac-stat-card">
@@ -44,7 +44,7 @@
                 <div class="ac-stat-icon-wrap" style="background-color: #fef3c7; color: #b45309;">🛡️</div>
             </div>
             <div class="ac-stat-value font-monospace text-primary">{{ $totalAdmin }}</div>
-            <div class="ac-stat-sub">Akses operasional penuh</div>
+            <div class="ac-stat-sub">{{ $activeAdminCount ?? 1 }} admin aktif berwenang</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -64,7 +64,7 @@
                 <div class="ac-stat-icon-wrap" style="background-color: #dcfce7; color: #15803d;">⛺</div>
             </div>
             <div class="ac-stat-value font-monospace text-success">{{ $totalPengguna }}</div>
-            <div class="ac-stat-sub">Akses katalog & pemesanan</div>
+            <div class="ac-stat-sub">{{ $totalPelangganTanpaAkun ?? 0 }} pelanggan toko on-site</div>
         </div>
     </div>
 </div>
@@ -111,28 +111,32 @@
                     <th>Nama Pengguna</th>
                     <th>Username</th>
                     <th>Peran (Role)</th>
+                    <th>Identitas Pelanggan</th>
                     <th>Status Akun</th>
                     <th>Terdaftar Sejak</th>
-                    <th class="text-center" style="width: 170px;">Aksi</th>
+                    <th class="text-center" style="width: 220px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($users as $user)
                     @php
                         $isCurrentAdmin = ((int) $user->id_user === (int) Auth::id());
+                        $isLastActiveAdmin = ($user->isAdmin() && $user->isActive() && ($activeAdminCount ?? 1) <= 1);
                     @endphp
                     <tr>
                         <td class="font-monospace text-muted small">#{{ $user->id_user }}</td>
                         <td>
                             <div class="d-flex align-items-center gap-2">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" 
-                                     style="width: 32px; height: 32px; font-size: 0.75rem; background-color: {{ $user->isAdmin() ? '#b45309' : ($user->isPemilik() ? '#0369a1' : '#15803d') }};">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" 
+                                     style="width: 34px; height: 34px; font-size: 0.8rem; background-color: {{ $user->isAdmin() ? '#b45309' : ($user->isPemilik() ? '#0369a1' : '#15803d') }};">
                                     {{ strtoupper(substr($user->nama_user, 0, 2)) }}
                                 </div>
                                 <div>
                                     <strong class="text-dark d-block">{{ $user->nama_user }}</strong>
                                     @if($isCurrentAdmin)
                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Akun Anda</span>
+                                    @elseif($isLastActiveAdmin)
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size: 0.65rem;">Admin Utama</span>
                                     @endif
                                 </div>
                             </div>
@@ -142,6 +146,19 @@
                         </td>
                         <td>
                             <x-status-badge :status="$user->normalized_role" />
+                        </td>
+                        <td>
+                            @if($user->pelanggan)
+                                <div class="small">
+                                    <span class="d-block text-dark font-monospace">{{ $user->pelanggan->nomor_telepon }}</span>
+                                    @php
+                                        $txCount = $user->pelanggan->penyewaan ? $user->pelanggan->penyewaan->count() : 0;
+                                    @endphp
+                                    <span class="badge bg-light text-muted border" style="font-size:0.65rem;">{{ $txCount }} Transaksi</span>
+                                </div>
+                            @else
+                                <span class="text-muted small fst-italic">Akun Internal</span>
+                            @endif
                         </td>
                         <td>
                             @if($user->isActive())
@@ -158,23 +175,37 @@
                                 <!-- Tombol Edit -->
                                 <a href="{{ route('admin.users.edit', $user->id_user) }}" 
                                    class="btn btn-sm btn-outline-primary px-2 py-1 shadow-sm" 
-                                   title="Edit Akun & Reset Password"
+                                   title="Edit Akun"
                                    id="btn-edit-user-{{ $user->id_user }}">
                                     ✏️ Edit
                                 </a>
+
+                                <!-- Tombol Reset Password -->
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-secondary px-2 py-1 shadow-sm" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modalResetPassword{{ $user->id_user }}"
+                                        title="Reset Password Pengguna"
+                                        id="btn-reset-password-{{ $user->id_user }}">
+                                    🔑 Reset
+                                </button>
 
                                 <!-- Tombol Toggle Status Aktif / Nonaktif -->
                                 @if($isCurrentAdmin)
                                     <button class="btn btn-sm btn-outline-secondary px-2 py-1" disabled title="Akun Anda sendiri tidak dapat dinonaktifkan">
                                         🔒 Terkunci
                                     </button>
+                                @elseif($isLastActiveAdmin)
+                                    <button class="btn btn-sm btn-outline-secondary px-2 py-1" disabled title="Admin aktif terakhir tidak dapat dinonaktifkan">
+                                        🛡️ Terkunci
+                                    </button>
                                 @else
-                                    <form action="{{ route('admin.users.toggle-status', $user->id_user) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin {{ $user->isActive() ? 'menonaktifkan' : 'mengaktifkan kembali' }} akun {{ $user->username }}?');">
+                                    <form action="{{ route('admin.users.toggle-status', $user->id_user) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin {{ $user->isActive() ? 'menonaktifkan' : 'mengaktifkan kembali' }} akun {{ $user->username }}? Data historis transaksi tetap aman terjaga.');">
                                         @csrf
                                         @method('PATCH')
                                         @if($user->isActive())
                                             <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1 shadow-sm" title="Nonaktifkan Akun" id="btn-toggle-user-{{ $user->id_user }}">
-                                                🚫 Nonaktifkan
+                                                🚫 Nonaktif
                                             </button>
                                         @else
                                             <button type="submit" class="btn btn-sm btn-outline-success px-2 py-1 shadow-sm" title="Aktifkan Akun" id="btn-toggle-user-{{ $user->id_user }}">
@@ -184,11 +215,47 @@
                                     </form>
                                 @endif
                             </div>
+
+                            <!-- Modal Reset Password -->
+                            <div class="modal fade" id="modalResetPassword{{ $user->id_user }}" tabindex="-1" aria-labelledby="modalResetLabel{{ $user->id_user }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered text-start">
+                                    <div class="modal-content border-0 shadow">
+                                        <form action="{{ route('admin.users.reset-password', $user->id_user) }}" method="POST">
+                                            @csrf
+                                            <div class="modal-header bg-dark text-white">
+                                                <h5 class="modal-title h6 mb-0" id="modalResetLabel{{ $user->id_user }}">🔑 Reset Password — {{ $user->username }}</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <div class="alert alert-light border small mb-3">
+                                                    Pengguna: <strong>{{ $user->nama_user }}</strong> (<code>{{ $user->username }}</code>)<br>
+                                                    Peran: <span class="badge bg-secondary">{{ $user->normalized_role }}</span>
+                                                </div>
+                                                <p class="small text-muted mb-3">
+                                                    Password baru akan di-hash secara aman menggunakan algoritma bcrypt bawaan Laravel. Password plaintext tidak disimpan maupun ditampilkan.
+                                                </p>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold text-dark">Password Baru <span class="text-danger">*</span></label>
+                                                    <input type="password" name="password" class="form-control" placeholder="Minimal 8 karakter" required minlength="8">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold text-dark">Konfirmasi Password Baru <span class="text-danger">*</span></label>
+                                                    <input type="password" name="password_confirmation" class="form-control" placeholder="Ulangi password baru" required minlength="8">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer bg-light">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                                                <button type="submit" class="btn btn-sm btn-primary px-3">Simpan Password Baru</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted">
+                        <td colspan="8" class="text-center py-5 text-muted">
                             <div class="mb-2" style="font-size: 2rem;">👤</div>
                             <h5 class="fw-bold mb-1">Tidak Ada Akun Pengguna</h5>
                             <p class="small mb-0">Tidak ditemukan akun yang sesuai dengan kriteria pencarian Anda.</p>

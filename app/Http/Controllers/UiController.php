@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Alat;
 use App\Models\Pembayaran;
 use App\Models\Penyewaan;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -47,6 +48,9 @@ class UiController extends Controller
         $stokPerluPerbaikan = $ringkasan['stok_perlu_perbaikan'];
         $stokRusak = $ringkasan['stok_rusak'];
 
+        $totalUsers = User::count();
+        $totalAktifUsers = User::where('status_aktif', 1)->count();
+
         return view('admin.dashboard', [
             'pesananMenunggu' => $pesananMenunggu,
             'countMenungguKonfirmasi' => $countMenungguKonfirmasi,
@@ -56,6 +60,8 @@ class UiController extends Controller
             'stokKondisiBaik' => $stokKondisiBaik,
             'stokPerluPerbaikan' => $stokPerluPerbaikan,
             'stokRusak' => $stokRusak,
+            'totalUsers' => $totalUsers,
+            'totalAktifUsers' => $totalAktifUsers,
         ]);
     }
 

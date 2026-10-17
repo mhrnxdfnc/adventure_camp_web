@@ -25,13 +25,21 @@
 
 @php
     $isSelf = ((int) $user->id_user === (int) Auth::id());
+    $isProtectedAdmin = ($isSelf || ($isLastAdmin ?? false));
 @endphp
 
 @if($isSelf)
-    <div class="alert alert-warning border d-flex align-items-center gap-2 mb-4" role="alert">
+    <div class="alert alert-warning border d-flex align-items-center gap-2 mb-4 shadow-sm" role="alert">
         <span style="font-size: 1.25rem;">⚠️</span>
         <div class="small">
             <strong>Proteksi Akun Sendiri:</strong> Anda sedang mengelola akun Administrator Anda sendiri. Peran dan status keaktifan dilindungi demi menjamin kesinambungan hak akses sistem.
+        </div>
+    </div>
+@elseif($isLastAdmin ?? false)
+    <div class="alert alert-warning border d-flex align-items-center gap-2 mb-4 shadow-sm" role="alert">
+        <span style="font-size: 1.25rem;">🛡️</span>
+        <div class="small">
+            <strong>Proteksi Administrator Terakhir:</strong> Akun ini adalah administrator aktif terakhir di sistem. Peran dan status keaktifan dilindungi agar sistem tidak kehilangan administrator.
         </div>
     </div>
 @endif
@@ -83,14 +91,14 @@
                     <!-- Peran Akun (Role) -->
                     <div class="mb-3">
                         <label for="role" class="form-label small fw-bold text-dark">Peran Hak Akses (Role) <span class="text-danger">*</span></label>
-                        @if($isSelf)
-                            <input type="text" class="form-control bg-light" value="Admin (Terkunci untuk akun sendiri)" disabled>
+                        @if($isProtectedAdmin)
+                            <input type="text" class="form-control bg-light" value="Admin (Terkunci demi kesinambungan akses admin)" disabled>
                             <input type="hidden" name="role" value="Admin">
-                            <small class="text-muted" style="font-size: 0.72rem;">Peran tidak dapat diubah agar akses administrasi Anda tidak hilang.</small>
+                            <small class="text-muted" style="font-size: 0.72rem;">Peran tidak dapat diubah agar akses administrasi sistem tidak hilang.</small>
                         @else
-                            <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required>
+                            <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required onchange="toggleCustomerFields(this.value)">
                                 <option value="Admin" {{ old('role', $user->normalized_role) === 'Admin' ? 'selected' : '' }}>Admin (Pengelolaan operasional penuh & inventaris)</option>
-                                <option value="Pemilik" {{ old('role', $user->normalized_role) === 'Pemilik' ? 'selected' : '' }}>Pemilik (Strictly Read-Only laporan keuangan & inventaris)</option>
+                                <option value="Pemilik" {{ old('role', $user->normalized_role) === 'Pemilik' ? 'selected' : '' }}>Pemilik (Strictly Read-Only monitoring & laporan)</option>
                                 <option value="Pengguna" {{ old('role', $user->normalized_role) === 'Pengguna' ? 'selected' : '' }}>Pengguna / Penyewa (Akses katalog & pemesanan alat)</option>
                             </select>
                             @error('role')
@@ -99,12 +107,37 @@
                         @endif
                     </div>
 
+                    <!-- Informasi Pelanggan jika peran Pengguna -->
+                    <div id="section-pelanggan-edit" class="p-3 bg-light rounded border mb-3 {{ old('role', $user->normalized_role) === 'Pengguna' ? '' : 'd-none' }}">
+                        <h4 class="h6 font-weight-bold text-dark mb-2">⛺ Data Profil Pelanggan Terkait</h4>
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <label for="nomor_telepon" class="form-label small fw-bold text-dark">Nomor Telepon</label>
+                                <input type="text" 
+                                       name="nomor_telepon" 
+                                       id="nomor_telepon" 
+                                       class="form-control form-control-sm font-monospace" 
+                                       value="{{ old('nomor_telepon', $user->pelanggan->nomor_telepon ?? '') }}" 
+                                       placeholder="Nomor kontak pelanggan">
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="alamat" class="form-label small fw-bold text-dark">Alamat Domisili</label>
+                                <input type="text" 
+                                       name="alamat" 
+                                       id="alamat" 
+                                       class="form-control form-control-sm" 
+                                       value="{{ old('alamat', $user->pelanggan->alamat ?? '') }}" 
+                                       placeholder="Alamat pelanggan">
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Status Keaktifan Akun -->
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-dark">Status Keaktifan Akun <span class="text-danger">*</span></label>
-                        @if($isSelf)
+                        @if($isProtectedAdmin)
                             <div class="p-2 bg-light rounded border small">
-                                <span class="badge bg-success">Aktif</span> (Akun Anda sendiri wajib tetap aktif)
+                                <span class="badge bg-success">Aktif</span> (Akun administrator ini wajib tetap aktif)
                             </div>
                             <input type="hidden" name="status_aktif" value="1">
                         @else
@@ -173,4 +206,16 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleCustomerFields(role) {
+    const sec = document.getElementById('section-pelanggan-edit');
+    if (!sec) return;
+    if (role === 'Pengguna') {
+        sec.classList.remove('d-none');
+    } else {
+        sec.classList.add('d-none');
+    }
+}
+</script>
 @endsection

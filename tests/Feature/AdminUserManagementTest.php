@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Pelanggan;
 use App\Models\Penyewaan;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -275,5 +276,228 @@ class AdminUserManagementTest extends TestCase
         ]);
         $loginRes->assertSessionHasErrors('username');
         $this->assertGuest();
+    }
+
+    /**
+     * Endpoint langsung reset password berhasil memperbarui hash password
+     */
+    public function test_direct_reset_password_endpoint_updates_hash_successfully(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $targetUser = User::where('username', 'budi')->first();
+
+        $newPassword = 'PasswordResetDirect999!';
+
+        $response = $this->actingAs($admin)->post(route('admin.users.reset-password', $targetUser->id_user), [
+            'password' => $newPassword,
+            'password_confirmation' => $newPassword,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $targetUser->refresh();
+        $this->assertTrue(Hash::check($newPassword, $targetUser->password));
+
+        // Logout admin sebelum menguji login pengguna dengan password baru
+        auth()->logout();
+
+        $loginRes = $this->post('/login', [
+            'username' => 'budi',
+            'password' => $newPassword,
+        ]);
+        $loginRes->assertRedirect(route('pengguna.dashboard'));
+    }
+
+    /**
+     * Reset password langsung memvalidasi panjang minimal dan konfirmasi password
+     */
+    public function test_direct_reset_password_validates_min_length_and_confirmation(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $targetUser = User::where('username', 'budi')->first();
+
+        // 1. Password terlalu pendek (< 8 karakter)
+        $resShort = $this->actingAs($admin)->post(route('admin.users.reset-password', $targetUser->id_user), [
+            'password' => 'pendek',
+            'password_confirmation' => 'pendek',
+        ]);
+        $resShort->assertSessionHasErrors('password');
+
+        // 2. Konfirmasi password tidak cocok
+        $resMismatch = $this->actingAs($admin)->post(route('admin.users.reset-password', $targetUser->id_user), [
+            'password' => 'passwordPanjang123',
+            'password_confirmation' => 'passwordBerbeda456',
+        ]);
+        $resMismatch->assertSessionHasErrors('password');
+    }
+
+    /**
+     * Admin aktif terakhir tidak dapat dinonaktifkan
+     */
+    public function test_cannot_deactivate_last_active_admin_account(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        // Pastikan hanya tersisa 1 admin aktif
+        User::where('role', 'Admin')
+            ->where('id_user', '!=', $admin->id_user)
+            ->update(['status_aktif' => 0]);
+
+        // Coba nonaktifkan admin terakhir lewat toggle-status
+        $resToggle = $this->actingAs($admin)->patch(route('admin.users.toggle-status', $admin->id_user));
+        $resToggle->assertSessionHas('error');
+        $admin->refresh();
+        $this->assertEquals(1, $admin->status_aktif);
+
+        // Coba nonaktifkan admin terakhir lewat destroy
+        $resDestroy = $this->actingAs($admin)->delete(route('admin.users.destroy', $admin->id_user));
+        $resDestroy->assertSessionHas('error');
+        $admin->refresh();
+        $this->assertEquals(1, $admin->status_aktif);
+
+        // Coba nonaktifkan admin terakhir lewat update
+        $resUpdate = $this->actingAs($admin)->put(route('admin.users.update', $admin->id_user), [
+            'nama_user' => 'Admin Satu-Satunya',
+            'username' => 'admin',
+            'role' => 'Admin',
+            'status_aktif' => 0,
+        ]);
+        $resUpdate->assertSessionHasErrors('status_aktif');
+        $admin->refresh();
+        $this->assertEquals(1, $admin->status_aktif);
+    }
+
+    /**
+     * Role admin aktif terakhir tidak dapat diubah menjadi peran non-admin
+     */
+    public function test_cannot_change_role_of_last_active_admin_account(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        // Pastikan hanya tersisa 1 admin aktif
+        User::where('role', 'Admin')
+            ->where('id_user', '!=', $admin->id_user)
+            ->update(['status_aktif' => 0]);
+
+        $response = $this->actingAs($admin)->put(route('admin.users.update', $admin->id_user), [
+            'nama_user' => 'Admin Satu-Satunya',
+            'username' => 'admin',
+            'role' => 'Pengguna', // Coba ubah jadi Pengguna
+            'status_aktif' => 1,
+        ]);
+
+        $response->assertSessionHasErrors('role');
+        $admin->refresh();
+        $this->assertEquals('Admin', $admin->role);
+    }
+
+    /**
+     * Admin dapat membuat akun pengguna dan menghubungkannya dengan pelanggan on-site yang sudah ada
+     */
+    public function test_admin_can_create_user_and_link_existing_onsite_customer(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        // Buat data pelanggan on-site walk-in yang belum memiliki akun user
+        $pelangganOnsite = Pelanggan::create([
+            'nama_pelanggan' => 'Pelanggan Toko Fisik',
+            'alamat' => 'Jl. Toko Kios No. 10',
+            'nomor_telepon' => '087799887766',
+            'created_at' => now(),
+        ]);
+
+        $initialPelangganCount = Pelanggan::count();
+
+        $response = $this->actingAs($admin)->post(route('admin.users.store'), [
+            'nama_user' => 'Pelanggan Toko Fisik',
+            'username' => 'user_onsite_01',
+            'password' => 'PasswordOnsite123!',
+            'password_confirmation' => 'PasswordOnsite123!',
+            'role' => 'Pengguna',
+            'status_aktif' => 1,
+            'id_pelanggan_onsite' => $pelangganOnsite->id_pelanggan,
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $response->assertSessionHas('success');
+
+        // Akun user tertaut ke pelanggan on-site yang sudah ada, tanpa membuat pelanggan ganda
+        $newUser = User::where('username', 'user_onsite_01')->first();
+        $this->assertNotNull($newUser);
+        $this->assertEquals($pelangganOnsite->id_pelanggan, $newUser->id_pelanggan);
+        $this->assertEquals($initialPelangganCount, Pelanggan::count());
+    }
+
+    /**
+     * Admin dapat membuat akun pengguna baru dengan rincian telepon dan alamat
+     */
+    public function test_admin_can_create_user_with_custom_phone_and_address(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        $response = $this->actingAs($admin)->post(route('admin.users.store'), [
+            'nama_user' => 'Kurnia Ramadhan',
+            'username' => 'kurnia_camp',
+            'password' => 'KurniaPass123!',
+            'password_confirmation' => 'KurniaPass123!',
+            'role' => 'Pengguna',
+            'status_aktif' => 1,
+            'nomor_telepon' => '081399882211',
+            'alamat' => 'Komplek Gn. Puntang No. 7',
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $response->assertSessionHas('success');
+
+        $newUser = User::where('username', 'kurnia_camp')->with('pelanggan')->first();
+        $this->assertNotNull($newUser);
+        $this->assertNotNull($newUser->pelanggan);
+        $this->assertEquals('081399882211', $newUser->pelanggan->nomor_telepon);
+        $this->assertEquals('Komplek Gn. Puntang No. 7', $newUser->pelanggan->alamat);
+    }
+
+    /**
+     * Pemilik dan Pengguna dilarang memanggil endpoint reset-password dan toggle-status (403)
+     */
+    public function test_non_admin_cannot_call_reset_password_or_toggle_status(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $pengguna = User::where('username', 'pelanggan')->first();
+        $targetUser = User::where('username', 'budi')->first();
+
+        // 1. Pemilik (Strictly Read-Only)
+        $this->actingAs($pemilik)->post(route('admin.users.reset-password', $targetUser->id_user), [
+            'password' => 'PercobaanReset123',
+            'password_confirmation' => 'PercobaanReset123',
+        ])->assertStatus(403);
+
+        $this->actingAs($pemilik)->patch(route('admin.users.toggle-status', $targetUser->id_user))
+            ->assertStatus(403);
+
+        // 2. Pengguna biasa
+        $this->actingAs($pengguna)->post(route('admin.users.reset-password', $targetUser->id_user), [
+            'password' => 'PercobaanReset123',
+            'password_confirmation' => 'PercobaanReset123',
+        ])->assertStatus(403);
+
+        $this->actingAs($pengguna)->patch(route('admin.users.toggle-status', $targetUser->id_user))
+            ->assertStatus(403);
+    }
+
+    /**
+     * Dashboard Admin menampilkan widget dan link akses Manajemen Pengguna
+     */
+    public function test_admin_dashboard_shows_user_management_widget_and_links(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        $response = $this->actingAs($admin)->get(route('admin.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Manajemen Pengguna');
+        $response->assertSee('Total Akun Terdaftar');
+        $response->assertSee(route('admin.users.index'));
+        $response->assertSee(route('admin.users.create'));
     }
 }
