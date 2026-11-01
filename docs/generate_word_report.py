@@ -308,7 +308,7 @@ def create_practical_report():
 
     add_callout_box(
         "Tautan Repositori GitHub & Berkas Basis Data",
-        "• Link Repositori GitHub : [LINK REPOSITORY GITHUB]\n"
+        "• Link Repositori GitHub : https://github.com/mhrnxdfnc/adventure_camp_web\n"
         "• Berkas Database Dump (.sql) : database/seeders/adventure_camp_rental_sample.sql (Ukuran: 72 KB, 15 Tabel InnoDB Normal 3NF)\n"
         "• Status Pengujian Sistem : 361 Test Cases LULUS 100% (2.255 Assertions, 0 Failure, 0 Error)\n"
         "• URL Aplikasi Lokal : http://adventure-camp-web.test atau http://127.0.0.1:8000",
@@ -832,13 +832,18 @@ def create_practical_report():
     add_para("Hasil pengujian otomatis PHPUnit dengan 361 skenario pengujian yang lulus 100% (2.255 asersi) membuktikan bahwa sistem memiliki keandalan tinggi, bebas dari anomali bisnis, serta siap untuk didemonstrasikan dan diimplementasikan pada operasional nyata.")
 
     # Simpan dokumen
-    doc.save(output_docx)
-    print(f"[OK] Laporan Praktikum Tugas Akhir berhasil dibuat di: {output_docx}")
-    try:
-        doc.save(output_docx_alt)
-        print(f"[OK] Juga berhasil memperbarui: {output_docx_alt}")
-    except PermissionError:
-        print(f"[INFO] {output_docx_alt} sedang dibuka oleh aplikasi Word. Berkas versi terbaru tersimpan di: {output_docx}")
+    saved = False
+    for target in [output_docx, output_docx_alt]:
+        try:
+            doc.save(target)
+            print(f"[OK] Berkas berhasil disimpan di: {target}")
+            saved = True
+        except PermissionError:
+            print(f"[INFO] {target} sedang dibuka di Microsoft Word.")
+    if not saved:
+        fallback = r"d:\APP\laragon\www\adventure_camp_web\Laporan_Praktikum_Tugas_Akhir_Adventure_Camp_Rental_Updated.docx"
+        doc.save(fallback)
+        print(f"[OK] Berkas cadangan tersimpan di: {fallback}")
 
 if __name__ == "__main__":
     create_practical_report()
