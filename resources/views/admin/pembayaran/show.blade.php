@@ -251,6 +251,25 @@
                             </button>
                         </form>
                     </div>
+                @else
+                    <div class="p-3 bg-light rounded-3 border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="fs-5">✅</span>
+                            <strong class="text-success">Pembayaran Lunas Diverifikasi</strong>
+                        </div>
+                        <p class="small text-muted mb-3">
+                            Nominal sebesar <strong>Rp {{ number_format($pembayaran->jumlah_pembayaran, 0, ',', '.') }}</strong> telah diterima.
+                            @if($penyewaan->isSiapDiambil())
+                                Pesanan siap untuk diproses ke tahap serah terima barang kepada penyewa.
+                            @endif
+                        </p>
+                        @if($penyewaan->isSiapDiambil())
+                            <a href="{{ route('admin.operasional.pengambilan', ['search' => $penyewaan->no_transaksi]) }}" class="btn btn-success w-100 font-weight-bold py-2 d-inline-flex justify-content-center align-items-center gap-2">
+                                <span>📦</span>
+                                <span>Lanjut ke Penyerahan Alat &rarr;</span>
+                            </a>
+                        @endif
+                    </div>
                 @endif
             </div>
         </div>

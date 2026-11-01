@@ -1,26 +1,26 @@
 <?php
 
-include "koneksi.php";
+include 'koneksi.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$data = json_decode(file_get_contents('php://input'), true);
 
-$id_pelanggan = (int)($data["id_pelanggan"] ?? 0);
-$id_user = (int)($data["id_user"] ?? 0);
-$tanggal_sewa = $data["tanggal_sewa"] ?? "";
-$tanggal_kembali = $data["tanggal_kembali"] ?? "";
-$items = $data["items"] ?? [];
+$id_pelanggan = (int) ($data['id_pelanggan'] ?? 0);
+$id_user = (int) ($data['id_user'] ?? 0);
+$tanggal_sewa = $data['tanggal_sewa'] ?? '';
+$tanggal_kembali = $data['tanggal_kembali'] ?? '';
+$items = $data['items'] ?? [];
 
 if (
     $id_pelanggan <= 0 ||
     $id_user <= 0 ||
-    $tanggal_sewa === "" ||
-    $tanggal_kembali === "" ||
+    $tanggal_sewa === '' ||
+    $tanggal_kembali === '' ||
     empty($items)
 ) {
 
     echo json_encode([
-        "status" => "error",
-        "message" => "Data transaksi belum lengkap"
+        'status' => 'error',
+        'message' => 'Data transaksi belum lengkap',
     ]);
 
     exit;
@@ -29,8 +29,8 @@ if (
 if ($tanggal_kembali < $tanggal_sewa) {
 
     echo json_encode([
-        "status" => "error",
-        "message" => "Tanggal kembali tidak boleh sebelum tanggal sewa"
+        'status' => 'error',
+        'message' => 'Tanggal kembali tidak boleh sebelum tanggal sewa',
     ]);
 
     exit;
@@ -46,19 +46,19 @@ try {
       TRX-20261004-001
     */
 
-    $prefix = "TRX-" . date("Ymd") . "-";
+    $prefix = 'TRX-'.date('Ymd').'-';
 
-    $stmtLast = $conn->prepare("
+    $stmtLast = $conn->prepare('
         SELECT no_transaksi
         FROM penyewaan
         WHERE no_transaksi LIKE ?
         ORDER BY no_transaksi DESC
         LIMIT 1
-    ");
+    ');
 
-    $like = $prefix . "%";
+    $like = $prefix.'%';
 
-    $stmtLast->bind_param("s", $like);
+    $stmtLast->bind_param('s', $like);
     $stmtLast->execute();
 
     $resultLast = $stmtLast->get_result();
@@ -67,20 +67,19 @@ try {
 
     if ($resultLast->num_rows > 0) {
 
-        $last = $resultLast->fetch_assoc()["no_transaksi"];
+        $last = $resultLast->fetch_assoc()['no_transaksi'];
 
-        $lastNumber = (int)substr(
+        $lastNumber = (int) substr(
             $last,
-            strrpos($last, "-") + 1
+            strrpos($last, '-') + 1
         );
 
         $urutan = $lastNumber + 1;
     }
 
     $no_transaksi =
-        $prefix .
-        str_pad($urutan, 3, "0", STR_PAD_LEFT);
-
+        $prefix.
+        str_pad($urutan, 3, '0', STR_PAD_LEFT);
 
     /*
       Insert penyewaan
@@ -100,7 +99,7 @@ try {
     ");
 
     $stmtSewa->bind_param(
-        "siiss",
+        'siiss',
         $no_transaksi,
         $id_pelanggan,
         $id_user,
@@ -110,29 +109,27 @@ try {
 
     $stmtSewa->execute();
 
-
     /*
       Proses setiap alat
     */
 
     foreach ($items as $item) {
 
-        $kode_alat = trim($item["kode_alat"] ?? "");
-        $jumlah = (int)($item["jumlah"] ?? 0);
-        $tarif = (float)($item["tarif_sewa"] ?? 0);
+        $kode_alat = trim($item['kode_alat'] ?? '');
+        $jumlah = (int) ($item['jumlah'] ?? 0);
+        $tarif = (float) ($item['tarif_sewa'] ?? 0);
 
-        if ($kode_alat === "" || $jumlah <= 0) {
+        if ($kode_alat === '' || $jumlah <= 0) {
             throw new Exception(
-                "Detail alat tidak valid"
+                'Detail alat tidak valid'
             );
         }
-
 
         /*
           Kunci stok untuk mencegah stok minus
         */
 
-        $stmtAlat = $conn->prepare("
+        $stmtAlat = $conn->prepare('
             SELECT
                 nama_alat,
                 stok,
@@ -141,10 +138,10 @@ try {
             FROM alat
             WHERE kode_alat = ?
             FOR UPDATE
-        ");
+        ');
 
         $stmtAlat->bind_param(
-            "s",
+            's',
             $kode_alat
         );
 
@@ -162,31 +159,28 @@ try {
 
         $alat = $resultAlat->fetch_assoc();
 
-
-        if ($alat["kondisi"] === "Rusak") {
+        if ($alat['kondisi'] === 'Rusak') {
 
             throw new Exception(
                 "Alat {$alat['nama_alat']} sedang rusak"
             );
         }
 
-
-        if ((int)$alat["stok"] < $jumlah) {
+        if ((int) $alat['stok'] < $jumlah) {
 
             throw new Exception(
                 "Stok {$alat['nama_alat']} tidak mencukupi"
             );
         }
 
-
         /*
           Simpan detail
         */
 
         $tarifDatabase =
-            (float)$alat["tarif_sewa"];
+            (float) $alat['tarif_sewa'];
 
-        $stmtDetail = $conn->prepare("
+        $stmtDetail = $conn->prepare('
             INSERT INTO detail_penyewaan
             (
                 no_transaksi,
@@ -195,10 +189,10 @@ try {
                 tarif_sewa
             )
             VALUES (?, ?, ?, ?)
-        ");
+        ');
 
         $stmtDetail->bind_param(
-            "ssid",
+            'ssid',
             $no_transaksi,
             $kode_alat,
             $jumlah,
@@ -207,19 +201,18 @@ try {
 
         $stmtDetail->execute();
 
-
         /*
           Kurangi stok
         */
 
-        $stmtStok = $conn->prepare("
+        $stmtStok = $conn->prepare('
             UPDATE alat
             SET stok = stok - ?
             WHERE kode_alat = ?
-        ");
+        ');
 
         $stmtStok->bind_param(
-            "is",
+            'is',
             $jumlah,
             $kode_alat
         );
@@ -227,16 +220,15 @@ try {
         $stmtStok->execute();
     }
 
-
     /*
       Audit trail
     */
 
-    $aktivitas = "Membuat transaksi penyewaan";
-    $modul = "Penyewaan";
+    $aktivitas = 'Membuat transaksi penyewaan';
+    $modul = 'Penyewaan';
     $dataDiproses = $no_transaksi;
 
-    $stmtLog = $conn->prepare("
+    $stmtLog = $conn->prepare('
         INSERT INTO activity_logs
         (
             id_user,
@@ -245,10 +237,10 @@ try {
             data_diproses
         )
         VALUES (?, ?, ?, ?)
-    ");
+    ');
 
     $stmtLog->bind_param(
-        "isss",
+        'isss',
         $id_user,
         $aktivitas,
         $modul,
@@ -257,13 +249,12 @@ try {
 
     $stmtLog->execute();
 
-
     $conn->commit();
 
     echo json_encode([
-        "status" => "success",
-        "message" => "Transaksi berhasil dibuat",
-        "no_transaksi" => $no_transaksi
+        'status' => 'success',
+        'message' => 'Transaksi berhasil dibuat',
+        'no_transaksi' => $no_transaksi,
     ]);
 
 } catch (Exception $e) {
@@ -271,8 +262,8 @@ try {
     $conn->rollback();
 
     echo json_encode([
-        "status" => "error",
-        "message" => $e->getMessage()
+        'status' => 'error',
+        'message' => $e->getMessage(),
     ]);
 }
 

@@ -82,7 +82,9 @@ class KeranjangController extends Controller
             ];
         }
 
-        if ($alat->kondisi !== 'Baik' || $alat->stok <= 0) {
+        $kapasitas = (int) $alat->total_kapasitas_layak;
+
+        if ($alat->kondisi !== 'Baik' || $kapasitas <= 0) {
             return [
                 'success' => false,
                 'message' => "Alat {$alat->nama_alat} saat ini sedang tidak siap sewa.",
@@ -94,12 +96,10 @@ class KeranjangController extends Controller
         $currentQty = isset($cart[$kodeAlat]) ? (int) $cart[$kodeAlat]['jumlah'] : 0;
         $newQty = $currentQty + $qty;
 
-        if ($newQty > (int) $alat->stok) {
-            $sisaBisaDitambah = max(0, (int) $alat->stok - $currentQty);
-
+        if ($newQty > $kapasitas) {
             return [
                 'success' => false,
-                'message' => "Stok alat {$alat->nama_alat} tidak mencukupi. Tersedia: {$alat->stok} unit (sudah di keranjang: {$currentQty} unit).",
+                'message' => "Stok alat {$alat->nama_alat} tidak mencukupi. Maksimal unit yang tersedia: {$kapasitas} unit (sudah di keranjang: {$currentQty} unit).",
                 'cart_count' => self::count($userId),
             ];
         }
@@ -159,13 +159,14 @@ class KeranjangController extends Controller
             ];
         }
 
-        if ($qty > (int) $alat->stok) {
-            $cart[$kodeAlat]['jumlah'] = (int) $alat->stok;
+        $kapasitas = (int) $alat->total_kapasitas_layak;
+        if ($qty > $kapasitas) {
+            $cart[$kodeAlat]['jumlah'] = $kapasitas;
             Session::put(self::getSessionKey($userId), $cart);
 
             return [
                 'success' => false,
-                'message' => "Jumlah disesuaikan ke stok maksimal yang tersedia ({$alat->stok} unit).",
+                'message' => "Jumlah disesuaikan ke stok maksimal yang tersedia ({$kapasitas} unit).",
                 'cart_count' => self::count($userId),
             ];
         }
@@ -201,7 +202,7 @@ class KeranjangController extends Controller
     /**
      * Dapatkan rincian lengkap barang di keranjang disinkronkan dengan data database terbaru
      *
-     * @return array{items: array, total_units: int, total_subtotal_per_hari: float}
+     * @return array{items: array, total_units: int, total_subtotal_per_hari: float, has_stok_issue: bool, removed_items: array}
      */
     public static function getItemsWithDetails(?int $userId = null): array
     {
@@ -212,6 +213,8 @@ class KeranjangController extends Controller
                 'items' => [],
                 'total_units' => 0,
                 'total_subtotal_per_hari' => 0.0,
+                'has_stok_issue' => false,
+                'removed_items' => [],
             ];
         }
 
@@ -222,32 +225,42 @@ class KeranjangController extends Controller
         $totalUnits = 0;
         $totalSubtotalPerHari = 0.0;
         $needsSync = false;
+        $removedItems = [];
+        $hasStokIssue = false;
 
         foreach ($cart as $kode => $item) {
             $alat = $alatList->get($kode);
 
-            // Jika alat sudah tidak ada atau kondisinya rusak, jangan masukkan
-            if (! $alat || $alat->kondisi !== 'Baik' || $alat->stok <= 0) {
+            // Jika alat sudah tidak ada atau kondisinya rusak atau kapasitas 0, jangan masukkan
+            $kapasitas = (int) $alat?->total_kapasitas_layak;
+            if (! $alat || $alat->kondisi !== 'Baik' || $kapasitas <= 0) {
                 unset($cart[$kode]);
                 $needsSync = true;
+                $removedItems[] = $alat ? $alat->nama_alat : $kode;
 
                 continue;
             }
 
             $jumlah = (int) $item['jumlah'];
-            $stokTersedia = (int) $alat->stok;
+            $stokToko = (int) $alat->stok;
             $tarifSewa = (float) $alat->tarif_sewa;
             $subtotalPerHari = $tarifSewa * $jumlah;
+            $stokCukup = ($jumlah <= $kapasitas);
+
+            if (! $stokCukup) {
+                $hasStokIssue = true;
+            }
 
             $items[] = [
                 'kode_alat' => $kode,
                 'alat' => $alat,
                 'nama_alat' => $alat->nama_alat,
                 'kategori' => $alat->kategori,
-                'stok' => $stokTersedia,
+                'stok' => $stokToko,
+                'kapasitas' => $kapasitas,
                 'tarif_sewa' => $tarifSewa,
                 'jumlah' => $jumlah,
-                'stok_cukup' => ($jumlah <= $stokTersedia),
+                'stok_cukup' => $stokCukup,
                 'subtotal_per_hari' => $subtotalPerHari,
             ];
 
@@ -263,6 +276,8 @@ class KeranjangController extends Controller
             'items' => $items,
             'total_units' => $totalUnits,
             'total_subtotal_per_hari' => $totalSubtotalPerHari,
+            'has_stok_issue' => $hasStokIssue,
+            'removed_items' => $removedItems,
         ];
     }
 
@@ -278,6 +293,8 @@ class KeranjangController extends Controller
             'cartItems' => $cartDetails['items'],
             'totalUnits' => $cartDetails['total_units'],
             'totalSubtotalPerHari' => $cartDetails['total_subtotal_per_hari'],
+            'hasStokIssue' => $cartDetails['has_stok_issue'],
+            'removedItems' => $cartDetails['removed_items'],
         ]);
     }
 
@@ -379,6 +396,16 @@ class KeranjangController extends Controller
                 'error',
                 'Keranjang belanja Anda masih kosong. Silakan pilih alat camping dari katalog terlebih dahulu.'
             );
+        }
+
+        // Cegah checkout jika ada alat yang melebihi stok yang tersedia
+        foreach ($cartDetails['items'] as $item) {
+            if (! $item['stok_cukup']) {
+                return redirect()->route('pengguna.keranjang.index')->with(
+                    'error',
+                    "Jumlah unit alat {$item['nama_alat']} ({$item['jumlah']} unit) melebihi stok yang tersedia ({$item['stok']} unit). Harap sesuaikan jumlah unit di keranjang sebelum checkout."
+                );
+            }
         }
 
         $tanggalSewaDefault = date('Y-m-d');

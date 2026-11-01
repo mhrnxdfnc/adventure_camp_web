@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Alat;
 use App\Models\DetailPenyewaan;
+use App\Models\PenangananKerusakan;
 use App\Models\RiwayatStok;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,52 +43,12 @@ class InventarisController extends Controller
             $query->where('kondisi', $kondisiFilter);
         }
 
-        $query->orderBy('kategori', 'asc')->orderBy('kode_alat', 'asc');
-        $alatList = $query->get();
-
-        // Agregasi stok yang sedang dialokasikan / disewa per kode_alat (status Siap Diambil, Sedang Disewa, Berjalan)
-        $dialokasikanMap = DetailPenyewaan::whereHas('penyewaan', function ($q) {
-            $q->whereIn('status_penyewaan', ['Siap Diambil', 'Sedang Disewa', 'Berjalan']);
-        })
-            ->selectRaw('kode_alat, SUM(CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) as total_alokasi')
-            ->groupBy('kode_alat')
-            ->pluck('total_alokasi', 'kode_alat');
-
-        // Agregasi unit rusak & perbaikan dari pengembalian sewa per kode_alat (memperhitungkan unit yang sudah diperbaiki)
-        $kondisiReturnMap = DetailPenyewaan::selectRaw('kode_alat, SUM(jumlah_rusak) as total_rusak, SUM(jumlah_perlu_perbaikan - COALESCE(jumlah_diperbaiki, 0)) as total_perbaikan')
-            ->groupBy('kode_alat')
-            ->get()
-            ->keyBy('kode_alat');
-
-        // Kalkulasi metrik inventaris per alat
-        $inventarisData = $alatList->map(function ($alat) use ($dialokasikanMap, $kondisiReturnMap) {
-            $dialokasikan = (int) ($dialokasikanMap[$alat->kode_alat] ?? 0);
-            $rusakReturn = (int) ($kondisiReturnMap[$alat->kode_alat]->total_rusak ?? 0);
-            $perbaikanReturn = (int) ($kondisiReturnMap[$alat->kode_alat]->total_perbaikan ?? 0);
-            $stokToko = (int) $alat->stok;
-
-            // Aturan Bisnis: Alat rusak / perlu perbaikan TIDAK dihitung sebagai stok siap sewa
-            $stokSiapSewa = ($alat->kondisi === 'Baik') ? $stokToko : 0;
-            $stokPerluPerbaikan = (($alat->kondisi === 'Perlu Perbaikan') ? $stokToko : 0) + $perbaikanReturn;
-            $stokRusak = (($alat->kondisi === 'Rusak') ? $stokToko : 0) + $rusakReturn;
-            $stokFisikTotal = $stokSiapSewa + $dialokasikan + $stokPerluPerbaikan + $stokRusak;
-
-            return (object) [
-                'alat' => $alat,
-                'kode_alat' => $alat->kode_alat,
-                'nama_alat' => $alat->nama_alat,
-                'kategori' => $alat->kategori,
-                'kondisi' => $alat->kondisi,
-                'tarif_sewa' => $alat->tarif_sewa,
-                'stok_toko' => $stokToko,
-                'stok_dialokasikan' => $dialokasikan,
-                'stok_fisik_total' => $stokFisikTotal,
-                'stok_siap_sewa' => $stokSiapSewa,
-                'stok_perlu_perbaikan' => $stokPerluPerbaikan,
-                'stok_rusak' => $stokRusak,
-                'stok_bermasalah' => $stokPerluPerbaikan + $stokRusak,
-            ];
-        });
+        // Dapatkan data inventaris lengkap menggunakan metode terpadu dari Model Alat
+        $inventarisData = Alat::getDaftarInventarisLengkap(
+            $search !== '' ? $search : null,
+            $kategoriFilter !== '' ? $kategoriFilter : null,
+            $kondisiFilter !== '' ? $kondisiFilter : null
+        );
 
         // Filter opsi status stok (misal: hanya stok menipis / kritis)
         $statusStok = $request->query('status_stok');
@@ -105,7 +66,8 @@ class InventarisController extends Controller
         $ringkasan = Alat::getRingkasanInventaris();
         $totalFisikSemua = $ringkasan['total_stok_fisik'];
         $totalSiapSewaSemua = $ringkasan['stok_siap_sewa'];
-        $totalDialokasikanSemua = $ringkasan['stok_sedang_disewa'];
+        $totalSedangDisewaSemua = $ringkasan['stok_sedang_disewa'];
+        $totalDialokasikanSemua = $ringkasan['stok_dialokasikan'];
         $totalPerluPerbaikanSemua = $ringkasan['stok_perlu_perbaikan'];
         $totalRusakSemua = $ringkasan['stok_rusak'];
         $totalBermasalahSemua = $totalPerluPerbaikanSemua + $totalRusakSemua;
@@ -121,6 +83,7 @@ class InventarisController extends Controller
             'statusStok' => $statusStok,
             'totalFisikSemua' => $totalFisikSemua,
             'totalSiapSewaSemua' => $totalSiapSewaSemua,
+            'totalSedangDisewaSemua' => $totalSedangDisewaSemua,
             'totalDialokasikanSemua' => $totalDialokasikanSemua,
             'totalPerluPerbaikanSemua' => $totalPerluPerbaikanSemua,
             'totalRusakSemua' => $totalRusakSemua,
@@ -137,28 +100,38 @@ class InventarisController extends Controller
     {
         $alat = Alat::where('kode_alat', $kode_alat)->firstOrFail();
 
-        // Cari pesanan aktif yang sedang mengalokasikan alat ini
-        $alokasiAktif = DetailPenyewaan::with(['penyewaan.pelanggan'])
+        // 1. Pesanan aktif yang unitnya sedang berada di tangan pelanggan (Sedang Disewa / Berjalan)
+        $sedangDisewaAktif = DetailPenyewaan::with(['penyewaan.pelanggan'])
             ->where('kode_alat', $kode_alat)
             ->whereHas('penyewaan', function ($q) {
-                $q->whereIn('status_penyewaan', ['Siap Diambil', 'Sedang Disewa', 'Berjalan']);
+                $q->whereIn('status_penyewaan', ['Sedang Disewa', 'Berjalan']);
             })
             ->get();
 
-        $jumlahDialokasikan = (int) $alokasiAktif->sum(function ($detail) {
-            return $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah;
+        $stokSedangDisewa = (int) $sedangDisewaAktif->sum(function ($detail) {
+            return $detail->jumlah_sisa_kembali;
         });
+
+        // 2. Pesanan aktif yang dialokasikan di toko namun belum diambil pelanggan
+        $dialokasikanAktif = DetailPenyewaan::with(['penyewaan.pelanggan'])
+            ->where('kode_alat', $kode_alat)
+            ->whereHas('penyewaan', function ($q) {
+                $q->whereIn('status_penyewaan', ['Menunggu Konfirmasi', 'Menunggu Pembayaran', 'Disetujui', 'Siap Diambil']);
+            })
+            ->get();
+
+        $stokDialokasikan = (int) $dialokasikanAktif->sum('jumlah');
 
         $rusakReturn = (int) DetailPenyewaan::where('kode_alat', $kode_alat)->sum('jumlah_rusak');
         $perbaikanReturn = (int) DetailPenyewaan::where('kode_alat', $kode_alat)
-            ->selectRaw('COALESCE(SUM(jumlah_perlu_perbaikan - COALESCE(jumlah_diperbaiki, 0)), 0) as total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN (jumlah_perlu_perbaikan - COALESCE(jumlah_diperbaiki, 0)) > 0 THEN (jumlah_perlu_perbaikan - COALESCE(jumlah_diperbaiki, 0)) ELSE 0 END), 0) as total')
             ->value('total');
 
         $stokToko = (int) $alat->stok;
         $stokSiapSewa = ($alat->kondisi === 'Baik') ? $stokToko : 0;
         $stokPerluPerbaikan = (($alat->kondisi === 'Perlu Perbaikan') ? $stokToko : 0) + $perbaikanReturn;
         $stokRusak = (($alat->kondisi === 'Rusak') ? $stokToko : 0) + $rusakReturn;
-        $stokFisikTotal = $stokSiapSewa + $jumlahDialokasikan + $stokPerluPerbaikan + $stokRusak;
+        $stokFisikTotal = $stokSiapSewa + $stokSedangDisewa + $stokPerluPerbaikan + $stokRusak;
 
         // Ambil transaksi yang memiliki unit menunggu perbaikan untuk alat ini
         $unitPerbaikanList = DetailPenyewaan::with(['penyewaan.pelanggan', 'penyewaan.pengembalian'])
@@ -169,19 +142,148 @@ class InventarisController extends Controller
         // Ambil riwayat perubahan stok khusus alat ini
         $riwayatStok = $alat->riwayatStok()->with('user')->take(30)->get();
 
+        // Ambil riwayat penanganan kerusakan & biaya perbaikan alat ini
+        $riwayatPenanganan = PenangananKerusakan::with(['admin', 'detailPenyewaan.penyewaan.pelanggan'])
+            ->where('kode_alat', $kode_alat)
+            ->orderByDesc('tanggal_tindakan')
+            ->orderByDesc('id_penanganan')
+            ->get();
+
         return view('admin.inventaris.show', [
             'alat' => $alat,
             'stokToko' => $stokToko,
-            'stokDialokasikan' => $jumlahDialokasikan,
+            'stokSedangDisewa' => $stokSedangDisewa,
+            'stokDialokasikan' => $stokDialokasikan,
             'stokFisikTotal' => $stokFisikTotal,
             'stokSiapSewa' => $stokSiapSewa,
             'stokPerluPerbaikan' => $stokPerluPerbaikan,
             'stokRusak' => $stokRusak,
             'stokBermasalah' => $stokPerluPerbaikan + $stokRusak,
             'unitPerbaikanList' => $unitPerbaikanList,
-            'alokasiAktif' => $alokasiAktif,
+            'sedangDisewaAktif' => $sedangDisewaAktif,
+            'dialokasikanAktif' => $dialokasikanAktif,
+            'alokasiAktif' => $sedangDisewaAktif,
             'riwayatStok' => $riwayatStok,
+            'riwayatPenanganan' => $riwayatPenanganan,
         ]);
+    }
+
+    /**
+     * Tindakan penanganan unit bermasalah / rusak:
+     * - Menunggu perbaikan
+     * - Catat biaya perbaikan
+     * - Selesai perbaikan & kembalikan ke stok siap sewa
+     * - Afkir / pensiunkan unit rusak
+     */
+    public function tindakKerusakan(Request $request, string $kode_alat): RedirectResponse
+    {
+        $request->validate([
+            'jenis_tindakan' => ['required', 'in:Menunggu Perbaikan,Catat Biaya Perbaikan,Selesai Perbaikan,Afkir/Pensiun'],
+            'id_detail' => ['nullable', 'integer', 'exists:detail_penyewaan,id_detail'],
+            'jumlah' => ['required', 'integer', 'min:1'],
+            'biaya_perbaikan' => ['nullable', 'numeric', 'min:0'],
+            'tanggal_tindakan' => ['required', 'date'],
+            'pelaksana_teknisi' => ['nullable', 'string', 'max:100'],
+            'keterangan' => ['nullable', 'string', 'max:500'],
+        ], [
+            'jenis_tindakan.required' => 'Pilih jenis tindakan penanganan.',
+            'jenis_tindakan.in' => 'Jenis tindakan penanganan tidak valid.',
+            'jumlah.required' => 'Jumlah unit wajib diisi.',
+            'jumlah.min' => 'Jumlah unit minimal 1.',
+            'tanggal_tindakan.required' => 'Tanggal tindakan penanganan wajib diisi.',
+        ]);
+
+        $jenisTindakan = $request->input('jenis_tindakan');
+        $idDetail = $request->input('id_detail');
+        $jumlah = (int) $request->input('jumlah');
+        $biayaPerbaikan = (float) ($request->input('biaya_perbaikan') ?? 0);
+        $tanggalTindakan = $request->input('tanggal_tindakan');
+        $teknisi = trim((string) $request->input('pelaksana_teknisi', ''));
+        $keterangan = trim((string) $request->input('keterangan', ''));
+
+        return DB::transaction(function () use ($kode_alat, $jenisTindakan, $idDetail, $jumlah, $biayaPerbaikan, $tanggalTindakan, $teknisi, $keterangan) {
+            $alat = Alat::where('kode_alat', $kode_alat)->lockForUpdate()->firstOrFail();
+            $admin = Auth::user();
+
+            $detail = null;
+            if ($idDetail) {
+                $detail = DetailPenyewaan::where('id_detail', $idDetail)
+                    ->where('kode_alat', $kode_alat)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            }
+
+            if ($jenisTindakan === 'Selesai Perbaikan') {
+                if ($detail) {
+                    $pending = max(0, (int) $detail->jumlah_perlu_perbaikan - (int) ($detail->jumlah_diperbaiki ?? 0));
+                    if ($pending < $jumlah) {
+                        return back()->with('error', "Jumlah unit selesai perbaikan ({$jumlah}) melebihi unit yang butuh servis ({$pending}).")->withInput();
+                    }
+                    $detail->jumlah_diperbaiki = (int) ($detail->jumlah_diperbaiki ?? 0) + $jumlah;
+                    $detail->save();
+
+                    $stokSebelum = (int) $alat->stok;
+                    $alat->stok = $stokSebelum + $jumlah;
+                    $alat->save();
+
+                    RiwayatStok::recordChange(
+                        $alat->kode_alat,
+                        'Selesai Perbaikan',
+                        $stokSebelum,
+                        +$jumlah,
+                        $alat->stok,
+                        "Selesai servis {$jumlah} unit dari sewa {$detail->no_transaksi}. Teknisi: ".($teknisi ?: 'Internal').($keterangan ? ". Ket: {$keterangan}" : ''),
+                        Auth::id()
+                    );
+                } else {
+                    if ($alat->kondisi === 'Perlu Perbaikan') {
+                        $alat->kondisi = 'Baik';
+                        $alat->save();
+                    }
+                }
+            } elseif ($jenisTindakan === 'Afkir/Pensiun') {
+                if ($alat->kondisi === 'Rusak' && $alat->stok >= $jumlah) {
+                    $stokSebelum = (int) $alat->stok;
+                    $alat->stok = max(0, $stokSebelum - $jumlah);
+                    $alat->save();
+
+                    RiwayatStok::recordChange(
+                        $alat->kode_alat,
+                        'Afkir Unit Rusak',
+                        $stokSebelum,
+                        -$jumlah,
+                        $alat->stok,
+                        "Pensiun/afkir {$jumlah} unit rusak permanen. ".($keterangan ?: 'Tidak dapat digunakan lagi'),
+                        Auth::id()
+                    );
+                }
+            }
+
+            // Catat ke tabel penanganan_kerusakan
+            PenangananKerusakan::create([
+                'kode_alat' => $alat->kode_alat,
+                'id_detail' => $idDetail ?: null,
+                'jenis_tindakan' => $jenisTindakan,
+                'jumlah_unit' => $jumlah,
+                'biaya_perbaikan' => $biayaPerbaikan,
+                'tanggal_tindakan' => $tanggalTindakan,
+                'pelaksana_teknisi' => $teknisi ?: null,
+                'keterangan' => $keterangan ?: null,
+                'id_admin' => Auth::id() ?? 1,
+                'created_at' => now(),
+            ]);
+
+            // Audit trail activity log
+            ActivityLog::record(
+                Auth::id(),
+                'Penanganan Kerusakan Alat',
+                'Inventaris',
+                "Tindakan {$jenisTindakan} untuk {$alat->kode_alat} ({$jumlah} unit). Biaya: Rp ".number_format($biayaPerbaikan, 0, ',', '.').' oleh '.$admin->nama
+            );
+
+            return redirect()->route('admin.inventaris.show', $alat->kode_alat)
+                ->with('success', "Tindakan '{$jenisTindakan}' untuk {$alat->nama_alat} berhasil disimpan.");
+        });
     }
 
     /**
@@ -193,6 +295,7 @@ class InventarisController extends Controller
         $request->validate([
             'id_detail' => ['nullable', 'integer', 'exists:detail_penyewaan,id_detail'],
             'jumlah' => ['required', 'integer', 'min:1'],
+            'biaya_perbaikan' => ['nullable', 'numeric', 'min:0'],
             'catatan' => ['nullable', 'string', 'max:255'],
         ], [
             'jumlah.required' => 'Jumlah unit yang selesai diperbaiki wajib diisi.',
@@ -201,9 +304,10 @@ class InventarisController extends Controller
 
         $idDetail = $request->input('id_detail');
         $jumlah = (int) $request->input('jumlah');
+        $biayaPerbaikan = (float) ($request->input('biaya_perbaikan') ?? 0);
         $catatan = trim((string) $request->input('catatan'));
 
-        return DB::transaction(function () use ($kode_alat, $idDetail, $jumlah, $catatan) {
+        return DB::transaction(function () use ($kode_alat, $idDetail, $jumlah, $biayaPerbaikan, $catatan) {
             $alat = Alat::where('kode_alat', $kode_alat)->lockForUpdate()->firstOrFail();
 
             if ($idDetail) {
@@ -239,6 +343,19 @@ class InventarisController extends Controller
                     Auth::id()
                 );
 
+                PenangananKerusakan::create([
+                    'kode_alat' => $alat->kode_alat,
+                    'id_detail' => $detail->id_detail,
+                    'jenis_tindakan' => 'Selesai Perbaikan',
+                    'jumlah_unit' => $jumlah,
+                    'biaya_perbaikan' => $biayaPerbaikan,
+                    'tanggal_tindakan' => now()->toDateString(),
+                    'pelaksana_teknisi' => Auth::user()->nama,
+                    'keterangan' => $keterangan,
+                    'id_admin' => Auth::id() ?? 1,
+                    'created_at' => now(),
+                ]);
+
                 ActivityLog::record(
                     Auth::id(),
                     'Konfirmasi Perbaikan Alat',
@@ -260,6 +377,19 @@ class InventarisController extends Controller
                 if ($catatan !== '') {
                     $keterangan .= ". Catatan: {$catatan}";
                 }
+
+                PenangananKerusakan::create([
+                    'kode_alat' => $alat->kode_alat,
+                    'id_detail' => null,
+                    'jenis_tindakan' => 'Selesai Perbaikan',
+                    'jumlah_unit' => $jumlah,
+                    'biaya_perbaikan' => $biayaPerbaikan,
+                    'tanggal_tindakan' => now()->toDateString(),
+                    'pelaksana_teknisi' => Auth::user()->nama,
+                    'keterangan' => $keterangan,
+                    'id_admin' => Auth::id() ?? 1,
+                    'created_at' => now(),
+                ]);
 
                 ActivityLog::record(
                     Auth::id(),

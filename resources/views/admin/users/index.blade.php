@@ -172,6 +172,14 @@
                         </td>
                         <td class="text-center">
                             <div class="d-inline-flex align-items-center gap-1">
+                                <!-- Tombol Detail Akun -->
+                                <a href="{{ route('admin.users.show', $user->id_user) }}" 
+                                   class="btn btn-sm btn-outline-info px-2 py-1 shadow-sm" 
+                                   title="Detail Akun"
+                                   id="btn-show-user-{{ $user->id_user }}">
+                                    👁️ Detail
+                                </a>
+
                                 <!-- Tombol Edit -->
                                 <a href="{{ route('admin.users.edit', $user->id_user) }}" 
                                    class="btn btn-sm btn-outline-primary px-2 py-1 shadow-sm" 

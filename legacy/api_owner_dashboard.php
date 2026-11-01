@@ -1,20 +1,43 @@
 <?php
-require_once __DIR__ . '/koneksi.php';
+
+require_once __DIR__.'/koneksi.php';
 header('Content-Type: application/json; charset=UTF-8');
-function scalar($conn,$sql){$r=$conn->query($sql);if(!$r)throw new Exception($conn->error);$row=$r->fetch_assoc();return $row['total']??0;}
-function rows($conn,$sql){$r=$conn->query($sql);if(!$r)throw new Exception($conn->error);$out=[];while($x=$r->fetch_assoc())$out[]=$x;return $out;}
+function scalar($conn, $sql)
+{
+    $r = $conn->query($sql);
+    if (! $r) {
+        throw new Exception($conn->error);
+    }$row = $r->fetch_assoc();
+
+    return $row['total'] ?? 0;
+}
+function rows($conn, $sql)
+{
+    $r = $conn->query($sql);
+    if (! $r) {
+        throw new Exception($conn->error);
+    }$out = [];
+    while ($x = $r->fetch_assoc()) {
+        $out[] = $x;
+    }
+
+    return $out;
+}
 try {
- $d=[];
- $d['penjualan_hari_ini']=(int)scalar($conn,"SELECT COUNT(*) total FROM penyewaan WHERE tanggal_sewa=CURDATE()");
- $d['penjualan_bulan_ini']=(int)scalar($conn,"SELECT COUNT(*) total FROM penyewaan WHERE YEAR(tanggal_sewa)=YEAR(CURDATE()) AND MONTH(tanggal_sewa)=MONTH(CURDATE())");
- $d['pendapatan_hari_ini']=(float)scalar($conn,"SELECT COALESCE(SUM(jumlah_pembayaran),0) total FROM pembayaran WHERE status_pembayaran='Lunas' AND DATE(tanggal_pembayaran)=CURDATE()");
- $d['pendapatan_bulan_ini']=(float)scalar($conn,"SELECT COALESCE(SUM(jumlah_pembayaran),0) total FROM pembayaran WHERE status_pembayaran='Lunas' AND YEAR(tanggal_pembayaran)=YEAR(CURDATE()) AND MONTH(tanggal_pembayaran)=MONTH(CURDATE())");
- $d['grafik_penjualan_7_hari']=rows($conn,"SELECT DATE_FORMAT(days.hari,'%d %b') label, COUNT(p.no_transaksi) total FROM (SELECT CURDATE() hari UNION ALL SELECT CURDATE()-INTERVAL 1 DAY UNION ALL SELECT CURDATE()-INTERVAL 2 DAY UNION ALL SELECT CURDATE()-INTERVAL 3 DAY UNION ALL SELECT CURDATE()-INTERVAL 4 DAY UNION ALL SELECT CURDATE()-INTERVAL 5 DAY UNION ALL SELECT CURDATE()-INTERVAL 6 DAY) days LEFT JOIN penyewaan p ON p.tanggal_sewa=days.hari GROUP BY days.hari ORDER BY days.hari");
- $d['grafik_pendapatan_hari_ini']=rows($conn,"SELECT LPAD(hours.jam,2,'0') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT 0 jam UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23) hours LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=CURDATE() AND HOUR(b.tanggal_pembayaran)=hours.jam AND b.status_pembayaran='Lunas' GROUP BY hours.jam ORDER BY hours.jam");
- $d['grafik_pendapatan_7_hari']=rows($conn,"SELECT DATE_FORMAT(days.hari,'%d %b') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT CURDATE() hari UNION ALL SELECT CURDATE()-INTERVAL 1 DAY UNION ALL SELECT CURDATE()-INTERVAL 2 DAY UNION ALL SELECT CURDATE()-INTERVAL 3 DAY UNION ALL SELECT CURDATE()-INTERVAL 4 DAY UNION ALL SELECT CURDATE()-INTERVAL 5 DAY UNION ALL SELECT CURDATE()-INTERVAL 6 DAY) days LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=days.hari AND b.status_pembayaran='Lunas' GROUP BY days.hari ORDER BY days.hari");
- $d['grafik_penjualan_bulan']=rows($conn,"SELECT DATE_FORMAT(days.hari,'%d') label, COUNT(p.no_transaksi) total FROM (SELECT DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY) hari FROM (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30) seq WHERE DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY)<=CURDATE()) days LEFT JOIN penyewaan p ON p.tanggal_sewa=days.hari GROUP BY days.hari ORDER BY days.hari");
- $d['grafik_pendapatan_bulan']=rows($conn,"SELECT DATE_FORMAT(days.hari,'%d') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY) hari FROM (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30) seq WHERE DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY)<=CURDATE()) days LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=days.hari AND b.status_pembayaran='Lunas' GROUP BY days.hari ORDER BY days.hari");
- $d['terbaru']=rows($conn,"SELECT p.no_transaksi,pl.nama_pelanggan,p.tanggal_sewa,p.tanggal_kembali,p.status_penyewaan FROM penyewaan p JOIN pelanggan pl ON pl.id_pelanggan=p.id_pelanggan ORDER BY p.tanggal_sewa DESC LIMIT 8");
- echo json_encode(['status'=>'success','data'=>$d],JSON_UNESCAPED_UNICODE);
-} catch(Throwable $e){http_response_code(500);echo json_encode(['status'=>'error','message'=>'Gagal mengambil analitik: '.$e->getMessage()],JSON_UNESCAPED_UNICODE);}
+    $d = [];
+    $d['penjualan_hari_ini'] = (int) scalar($conn, 'SELECT COUNT(*) total FROM penyewaan WHERE tanggal_sewa=CURDATE()');
+    $d['penjualan_bulan_ini'] = (int) scalar($conn, 'SELECT COUNT(*) total FROM penyewaan WHERE YEAR(tanggal_sewa)=YEAR(CURDATE()) AND MONTH(tanggal_sewa)=MONTH(CURDATE())');
+    $d['pendapatan_hari_ini'] = (float) scalar($conn, "SELECT COALESCE(SUM(jumlah_pembayaran),0) total FROM pembayaran WHERE status_pembayaran='Lunas' AND DATE(tanggal_pembayaran)=CURDATE()");
+    $d['pendapatan_bulan_ini'] = (float) scalar($conn, "SELECT COALESCE(SUM(jumlah_pembayaran),0) total FROM pembayaran WHERE status_pembayaran='Lunas' AND YEAR(tanggal_pembayaran)=YEAR(CURDATE()) AND MONTH(tanggal_pembayaran)=MONTH(CURDATE())");
+    $d['grafik_penjualan_7_hari'] = rows($conn, "SELECT DATE_FORMAT(days.hari,'%d %b') label, COUNT(p.no_transaksi) total FROM (SELECT CURDATE() hari UNION ALL SELECT CURDATE()-INTERVAL 1 DAY UNION ALL SELECT CURDATE()-INTERVAL 2 DAY UNION ALL SELECT CURDATE()-INTERVAL 3 DAY UNION ALL SELECT CURDATE()-INTERVAL 4 DAY UNION ALL SELECT CURDATE()-INTERVAL 5 DAY UNION ALL SELECT CURDATE()-INTERVAL 6 DAY) days LEFT JOIN penyewaan p ON p.tanggal_sewa=days.hari GROUP BY days.hari ORDER BY days.hari");
+    $d['grafik_pendapatan_hari_ini'] = rows($conn, "SELECT LPAD(hours.jam,2,'0') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT 0 jam UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23) hours LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=CURDATE() AND HOUR(b.tanggal_pembayaran)=hours.jam AND b.status_pembayaran='Lunas' GROUP BY hours.jam ORDER BY hours.jam");
+    $d['grafik_pendapatan_7_hari'] = rows($conn, "SELECT DATE_FORMAT(days.hari,'%d %b') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT CURDATE() hari UNION ALL SELECT CURDATE()-INTERVAL 1 DAY UNION ALL SELECT CURDATE()-INTERVAL 2 DAY UNION ALL SELECT CURDATE()-INTERVAL 3 DAY UNION ALL SELECT CURDATE()-INTERVAL 4 DAY UNION ALL SELECT CURDATE()-INTERVAL 5 DAY UNION ALL SELECT CURDATE()-INTERVAL 6 DAY) days LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=days.hari AND b.status_pembayaran='Lunas' GROUP BY days.hari ORDER BY days.hari");
+    $d['grafik_penjualan_bulan'] = rows($conn, "SELECT DATE_FORMAT(days.hari,'%d') label, COUNT(p.no_transaksi) total FROM (SELECT DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY) hari FROM (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30) seq WHERE DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY)<=CURDATE()) days LEFT JOIN penyewaan p ON p.tanggal_sewa=days.hari GROUP BY days.hari ORDER BY days.hari");
+    $d['grafik_pendapatan_bulan'] = rows($conn, "SELECT DATE_FORMAT(days.hari,'%d') label, COALESCE(SUM(b.jumlah_pembayaran),0) total FROM (SELECT DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY) hari FROM (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30) seq WHERE DATE_ADD(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL seq.n DAY)<=CURDATE()) days LEFT JOIN pembayaran b ON DATE(b.tanggal_pembayaran)=days.hari AND b.status_pembayaran='Lunas' GROUP BY days.hari ORDER BY days.hari");
+    $d['terbaru'] = rows($conn, 'SELECT p.no_transaksi,pl.nama_pelanggan,p.tanggal_sewa,p.tanggal_kembali,p.status_penyewaan FROM penyewaan p JOIN pelanggan pl ON pl.id_pelanggan=p.id_pelanggan ORDER BY p.tanggal_sewa DESC LIMIT 8');
+    echo json_encode(['status' => 'success', 'data' => $d], JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Gagal mengambil analitik: '.$e->getMessage()], JSON_UNESCAPED_UNICODE);
+}
 $conn->close();

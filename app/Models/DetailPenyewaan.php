@@ -50,6 +50,38 @@ class DetailPenyewaan extends Model
     }
 
     /**
+     * Kuantitas acuan yang disewakan / diserahkan
+     */
+    public function getJumlahAcuanAttribute(): int
+    {
+        return $this->jumlah_diserahkan > 0 ? (int) $this->jumlah_diserahkan : (int) $this->jumlah;
+    }
+
+    /**
+     * Total kuantitas unit yang sudah tercatat dikembalikan (baik + perlu perbaikan + rusak)
+     */
+    public function getJumlahSudahKembaliAttribute(): int
+    {
+        return (int) $this->jumlah_kembali_baik + (int) $this->jumlah_perlu_perbaikan + (int) $this->jumlah_rusak;
+    }
+
+    /**
+     * Sisa kuantitas unit yang masih belum dikembalikan ke toko
+     */
+    public function getJumlahSisaKembaliAttribute(): int
+    {
+        return max(0, $this->jumlah_acuan - $this->jumlah_sudah_kembali);
+    }
+
+    /**
+     * Periksa apakah seluruh unit untuk baris detail ini sudah lunas dikembalikan
+     */
+    public function isSudahLengkapKembali(): bool
+    {
+        return $this->jumlah_sisa_kembali === 0;
+    }
+
+    /**
      * Relasi ke master data alat
      */
     public function alat(): BelongsTo

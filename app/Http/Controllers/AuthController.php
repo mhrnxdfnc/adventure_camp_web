@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Pelanggan;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -43,7 +44,7 @@ class AuthController extends Controller
         $user = User::where('username', $credentials['username'])->first();
 
         // 1. Verifikasi keberadaan akun
-        if (!$user) {
+        if (! $user) {
             return back()->withInput($request->only('username', 'role'))->withErrors([
                 'username' => 'Username atau password salah.',
             ]);
@@ -65,27 +66,27 @@ class AuthController extends Controller
             }
         }
 
-        if (!$passwordValid) {
+        if (! $passwordValid) {
             return back()->withInput($request->only('username', 'role'))->withErrors([
                 'password' => 'Username atau password salah.',
             ]);
         }
 
         // 3. Verifikasi status akun aktif
-        if (!$user->isActive()) {
+        if (! $user->isActive()) {
             return back()->withInput($request->only('username', 'role'))->withErrors([
                 'username' => 'Akun Anda telah dinonaktifkan. Silakan hubungi Administrator.',
             ]);
         }
 
         // 4. Verifikasi kecocokan role pilihan dengan role di database
-        if (!empty($credentials['role'])) {
+        if (! empty($credentials['role'])) {
             $selectedRole = $credentials['role'];
             $allowedRoles = in_array($selectedRole, ['Pengguna', 'Pelanggan'], true)
                 ? ['Pengguna', 'Pelanggan']
                 : [$selectedRole];
 
-            if (!in_array($user->role, $allowedRoles, true)) {
+            if (! in_array($user->role, $allowedRoles, true)) {
                 return back()->withInput($request->only('username', 'role'))->withErrors([
                     'role' => "Peran akun Anda adalah {$user->normalized_role}, tidak sesuai dengan pilihan peran ({$selectedRole}).",
                 ]);
@@ -95,6 +96,14 @@ class AuthController extends Controller
         // 5. Login sesi dan regenerasi session id
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
+
+        // Catat aktivitas login di audit trail log
+        ActivityLog::record(
+            $user->id_user,
+            'Login Sistem',
+            'Autentikasi',
+            "Pengguna {$user->username} ({$user->normalized_role}) berhasil masuk ke sistem"
+        );
 
         return $this->redirectByRole($user, "Selamat datang kembali, {$user->nama_user}!");
     }
@@ -160,9 +169,17 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
+        // Catat aktivitas registrasi di audit trail log
+        ActivityLog::record(
+            $user->id_user,
+            'Registrasi Pengguna Baru',
+            'Autentikasi',
+            "Pengguna baru terdaftar dengan username {$user->username} atas nama {$user->nama_user}"
+        );
+
         return redirect()->route('pengguna.dashboard')->with(
             'success',
-            'Pendaftaran berhasil! Selamat datang di Adventure Camp Rental, ' . $user->nama_user . '.'
+            'Pendaftaran berhasil! Selamat datang di Adventure Camp Rental, '.$user->nama_user.'.'
         );
     }
 
@@ -171,6 +188,16 @@ class AuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user) {
+            ActivityLog::record(
+                $user->id_user,
+                'Logout Sistem',
+                'Autentikasi',
+                "Pengguna {$user->username} ({$user->normalized_role}) telah keluar dari sistem"
+            );
+        }
+
         Auth::logout();
 
         $request->session()->invalidate();

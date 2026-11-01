@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -14,7 +14,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('users')) {
             // 1. Tambahkan kolom remember_token jika belum ada
-            if (!Schema::hasColumn('users', 'remember_token')) {
+            if (! Schema::hasColumn('users', 'remember_token')) {
                 Schema::table('users', function (Blueprint $table) {
                     $table->rememberToken()->after('status_aktif');
                 });

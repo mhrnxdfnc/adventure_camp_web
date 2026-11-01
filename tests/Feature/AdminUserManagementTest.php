@@ -500,4 +500,60 @@ class AdminUserManagementTest extends TestCase
         $response->assertSee(route('admin.users.index'));
         $response->assertSee(route('admin.users.create'));
     }
+
+    /**
+     * Admin dapat melihat halaman rincian detail akun pengguna (show)
+     */
+    public function test_admin_can_view_user_detail_page(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $targetUser = User::where('username', 'pelanggan')->first();
+
+        $response = $this->actingAs($admin)->get(route('admin.users.show', $targetUser->id_user));
+
+        $response->assertStatus(200);
+        $response->assertSee('Rincian Akun: '.$targetUser->nama_user);
+        $response->assertSee($targetUser->username);
+        $response->assertSee('Pengguna / Pelanggan');
+        $response->assertSee('Aktif');
+        $response->assertSee('Terdaftar Sejak:');
+        $response->assertSee($targetUser->pelanggan->nomor_telepon);
+    }
+
+    /**
+     * Halaman detail akun pengguna TIDAK membocorkan password, hash bcrypt, maupun remember token
+     */
+    public function test_user_detail_page_does_not_leak_passwords_hashes_or_tokens(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $targetUser = User::where('username', 'pelanggan')->first();
+
+        $response = $this->actingAs($admin)->get(route('admin.users.show', $targetUser->id_user));
+
+        $response->assertStatus(200);
+        $response->assertDontSee($targetUser->password);
+        $response->assertDontSee('$2y$');
+        $response->assertDontSee('remember_token');
+        $response->assertSee('Password dan kredensial aman terenkripsi (bcrypt).');
+    }
+
+    /**
+     * Pemilik dan Pengguna dilarang mengakses halaman detail pengguna (403)
+     */
+    public function test_non_admin_cannot_access_user_detail_page(): void
+    {
+        $pemilik = User::where('username', 'pemilik')->first();
+        $pengguna = User::where('username', 'pelanggan')->first();
+        $targetUser = User::where('username', 'admin')->first();
+
+        // Pemilik -> 403
+        $this->actingAs($pemilik)->get(route('admin.users.show', $targetUser->id_user))->assertStatus(403);
+
+        // Pengguna -> 403
+        $this->actingAs($pengguna)->get(route('admin.users.show', $targetUser->id_user))->assertStatus(403);
+
+        // Tamu -> 302 login
+        auth()->logout();
+        $this->get(route('admin.users.show', $targetUser->id_user))->assertRedirect(route('login'));
+    }
 }

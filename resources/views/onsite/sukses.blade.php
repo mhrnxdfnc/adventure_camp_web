@@ -107,6 +107,10 @@
 
                 <!-- Tombol Aksi Selesai / Pesan Baru -->
                 <div class="d-grid gap-2">
+                    <button onclick="window.print()" type="button" class="btn btn-outline-dark w-100 py-2.5 fw-semibold d-flex align-items-center justify-content-center gap-2 kiosk-btn-touch shadow-sm" id="btn-cetak-struk-kios">
+                        <span>🖨️</span>
+                        <span>Cetak Bukti Pemesanan (Print Struk)</span>
+                    </button>
                     <form action="{{ route('onsite.selesai') }}" method="POST">
                         @csrf
                         <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold py-3 kiosk-btn-touch shadow-sm">

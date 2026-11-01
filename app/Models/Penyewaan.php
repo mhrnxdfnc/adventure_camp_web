@@ -97,15 +97,21 @@ class Penyewaan extends Model
     /**
      * Hitung total biaya sewa untuk alat tertentu:
      * Total biaya setiap alat = tarif sewa per hari × jumlah alat × lama sewa dalam hari.
+     * Menggunakan perhitungan numerik terpusat dengan pembulatan 2 desimal untuk mencegah ketidakakuratan floating-point.
      */
-    public static function hitungTotalBiaya(float $tarifSewaPerHari, int $jumlahAlat, int $durasiHari): float
+    public static function hitungTotalBiaya(float|int|string $tarifSewaPerHari, int $jumlahAlat, int $durasiHari): float
     {
-        return $tarifSewaPerHari * max(0, $jumlahAlat) * max(1, $durasiHari);
+        $tarif = (float) $tarifSewaPerHari;
+        $jumlah = max(0, $jumlahAlat);
+        $durasi = max(0, $durasiHari);
+
+        return (float) round($tarif * $jumlah * $durasi, 2);
     }
 
     /**
      * Hitung sisa stok alat yang benar-benar tersedia untuk periode tanggal sewa tertentu.
-     * Memperhitungkan stok fisik toko dikurangi pemesanan aktif lain yang beririsan periode sewanya.
+     * Memperhitungkan total kapasitas layak milik toko (stok toko + sedang disewa di lapangan)
+     * dikurangi seluruh pemesanan aktif yang beririsan periode sewanya (mencegah pemotongan ganda & overbooking).
      */
     public static function hitungStokTersediaPeriode(
         string $kodeAlat,
@@ -118,14 +124,37 @@ class Penyewaan extends Model
             return 0;
         }
 
-        $stokFisik = (int) $alat->stok;
+        // 1. Kapasitas total alat layak sewa milik toko:
+        // Stok fisik di toko saat ini + unit yang sedang disewa di lapangan (dikurangi unit yang sudah kembali)
+        $unitDiLapangan = (int) DetailPenyewaan::where('kode_alat', $kodeAlat)
+            ->whereHas('penyewaan', function ($q) {
+                $q->whereIn('status_penyewaan', ['Sedang Disewa', 'Berjalan']);
+            })
+            ->selectRaw('COALESCE(SUM(CASE WHEN ((CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) - COALESCE(jumlah_kembali_baik, 0) - COALESCE(jumlah_perlu_perbaikan, 0) - COALESCE(jumlah_rusak, 0)) > 0 THEN ((CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) - COALESCE(jumlah_kembali_baik, 0) - COALESCE(jumlah_perlu_perbaikan, 0) - COALESCE(jumlah_rusak, 0)) ELSE 0 END), 0) as total')
+            ->value('total');
+
+        $unitDiLapangan = max(0, $unitDiLapangan);
+        $totalKapasitasLayak = (int) $alat->stok + $unitDiLapangan;
+
+        if ($totalKapasitasLayak <= 0) {
+            return 0;
+        }
 
         $sewaStr = Carbon::parse($tanggalSewa)->format('Y-m-d');
         $kembaliStr = Carbon::parse($tanggalKembali)->format('Y-m-d');
 
+        // 2. Hitung seluruh pemesanan aktif yang periode sewanya beririsan dengan tanggal yang diminta:
+        // [tanggal_sewa < $kembaliStr AND tanggal_kembali > $sewaStr]
+        // Untuk transaksi yang sedang disewa / berjalan, hitung sisa unit yang belum kembali
         $reserved = (int) DetailPenyewaan::where('kode_alat', $kodeAlat)
             ->whereHas('penyewaan', function ($q) use ($sewaStr, $kembaliStr, $excludeNoTransaksi) {
-                $q->whereIn('status_penyewaan', ['Menunggu Pembayaran', 'Disetujui', 'Siap Diambil', 'Sedang Disewa', 'Berjalan'])
+                $q->whereIn('status_penyewaan', [
+                    'Menunggu Pembayaran',
+                    'Disetujui',
+                    'Siap Diambil',
+                    'Sedang Disewa',
+                    'Berjalan',
+                ])
                     ->whereDate('tanggal_sewa', '<', $kembaliStr)
                     ->whereDate('tanggal_kembali', '>', $sewaStr);
 
@@ -133,9 +162,12 @@ class Penyewaan extends Model
                     $q->where('no_transaksi', '!=', $excludeNoTransaksi);
                 }
             })
-            ->sum('jumlah');
+            ->selectRaw('COALESCE(SUM(CASE WHEN (SELECT status_penyewaan FROM penyewaan WHERE penyewaan.no_transaksi = detail_penyewaan.no_transaksi) IN (\'Sedang Disewa\', \'Berjalan\') THEN (CASE WHEN ((CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) - COALESCE(jumlah_kembali_baik, 0) - COALESCE(jumlah_perlu_perbaikan, 0) - COALESCE(jumlah_rusak, 0)) > 0 THEN ((CASE WHEN jumlah_diserahkan > 0 THEN jumlah_diserahkan ELSE jumlah END) - COALESCE(jumlah_kembali_baik, 0) - COALESCE(jumlah_perlu_perbaikan, 0) - COALESCE(jumlah_rusak, 0)) ELSE 0 END) ELSE jumlah END), 0) as total')
+            ->value('total');
 
-        return max(0, $stokFisik - $reserved);
+        $reserved = max(0, $reserved);
+
+        return max(0, $totalKapasitasLayak - $reserved);
     }
 
     /**
@@ -185,7 +217,7 @@ class Penyewaan extends Model
             ->value('total');
 
         if ($calculated > 0) {
-            return $calculated * $durasi;
+            return (float) round($calculated * $durasi, 2);
         }
 
         return (float) ($this->pembayaran?->total_biaya ?? 0);
@@ -228,6 +260,26 @@ class Penyewaan extends Model
     }
 
     /**
+     * Dapatkan nama petugas / admin yang memproses transaksi
+     */
+    public function getPetugasPemrosesAttribute(): string
+    {
+        if ($this->pembayaran && $this->pembayaran->admin) {
+            return $this->pembayaran->admin->nama_user;
+        }
+
+        if ($this->pengambilan && $this->pengambilan->admin) {
+            return $this->pengambilan->admin->nama_user;
+        }
+
+        if ($this->pengembalian && $this->pengembalian->admin) {
+            return $this->pengembalian->admin->nama_user;
+        }
+
+        return $this->isOnsite() ? 'Kasir On-Site' : 'Sistem Online';
+    }
+
+    /**
      * Validasi status pesanan: hanya pesanan yang telah disetujui Admin yang dapat melihat instruksi pembayaran
      */
     public function isSiapDibayar(): bool
@@ -252,7 +304,7 @@ class Penyewaan extends Model
      */
     public function isSiapDiambil(): bool
     {
-        $statusValid = in_array($this->status_penyewaan, ['Siap Diambil', 'Disetujui'], true);
+        $statusValid = in_array($this->status_penyewaan, ['Siap Diambil', 'Disetujui', 'Menunggu Pembayaran'], true);
         $pembayaranLunas = $this->pembayaran && $this->pembayaran->isLunas();
 
         return $statusValid && $pembayaranLunas;

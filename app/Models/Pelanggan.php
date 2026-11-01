@@ -64,6 +64,16 @@ class Pelanggan extends Model
         return preg_replace('/[^\d]/', '', $cleaned);
     }
 
+    public function getNamaAttribute(): string
+    {
+        return $this->nama_pelanggan ?? '';
+    }
+
+    public function getNoTeleponAttribute(): string
+    {
+        return $this->nomor_telepon ?? '';
+    }
+
     /**
      * Samarkan nama pelanggan untuk melindungi privasi di tablet umum (contoh: "An** Pr*****")
      */

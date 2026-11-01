@@ -1,14 +1,16 @@
 <?php
+
 session_start();
 require_once 'koneksi.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
-function response($status, $message, $data = null) {
+function response($status, $message, $data = null)
+{
     echo json_encode([
         'status' => $status,
         'message' => $message,
-        'data' => $data
+        'data' => $data,
     ]);
     exit;
 }
@@ -19,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (
-    !isset($_SESSION['id_user']) ||
+    ! isset($_SESSION['id_user']) ||
     ($_SESSION['role'] ?? '') !== 'Pelanggan' ||
     empty($_SESSION['id_pelanggan'])
 ) {
@@ -29,7 +31,7 @@ if (
 
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (!is_array($input)) {
+if (! is_array($input)) {
     http_response_code(400);
     response('error', 'Data pengajuan tidak valid.');
 }
@@ -43,8 +45,8 @@ $end = DateTime::createFromFormat('!Y-m-d', $tanggalKembali);
 $today = new DateTime('today');
 
 if (
-    !$start || $start->format('Y-m-d') !== $tanggalSewa ||
-    !$end || $end->format('Y-m-d') !== $tanggalKembali
+    ! $start || $start->format('Y-m-d') !== $tanggalSewa ||
+    ! $end || $end->format('Y-m-d') !== $tanggalKembali
 ) {
     http_response_code(400);
     response('error', 'Format tanggal tidak valid.');
@@ -55,7 +57,7 @@ if ($start < $today || $end <= $start) {
     response('error', 'Tanggal sewa harus hari ini atau setelahnya, dan tanggal kembali harus sesudah tanggal sewa.');
 }
 
-if (!is_array($items) || count($items) === 0) {
+if (! is_array($items) || count($items) === 0) {
     http_response_code(400);
     response('error', 'Pilih minimal satu alat.');
 }
@@ -99,7 +101,7 @@ try {
     $stmt->bind_param('ii', $idUser, $idPelanggan);
     $stmt->execute();
 
-    if (!$stmt->get_result()->fetch_assoc()) {
+    if (! $stmt->get_result()->fetch_assoc()) {
         throw new Exception('Akun pelanggan tidak valid atau tidak aktif.');
     }
     $stmt->close();
@@ -110,39 +112,39 @@ try {
 
     foreach ($pilihan as $kode => $jumlah) {
         $stmt = $conn->prepare(
-            "SELECT kode_alat, nama_alat, stok, kondisi, tarif_sewa
+            'SELECT kode_alat, nama_alat, stok, kondisi, tarif_sewa
              FROM alat
              WHERE kode_alat = ?
-             FOR UPDATE"
+             FOR UPDATE'
         );
         $stmt->bind_param('s', $kode);
         $stmt->execute();
         $alat = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        if (!$alat) {
+        if (! $alat) {
             throw new Exception("Alat dengan kode $kode tidak ditemukan.");
         }
 
         if ($alat['kondisi'] !== 'Baik') {
-            throw new Exception($alat['nama_alat'] . ' sedang tidak tersedia.');
+            throw new Exception($alat['nama_alat'].' sedang tidak tersedia.');
         }
 
         if ($jumlah > (int) $alat['stok']) {
             throw new Exception(
-                'Stok ' . $alat['nama_alat'] . ' tidak mencukupi.'
+                'Stok '.$alat['nama_alat'].' tidak mencukupi.'
             );
         }
 
         $detail[] = [
             'kode_alat' => $alat['kode_alat'],
             'jumlah' => $jumlah,
-            'tarif_sewa' => (float) $alat['tarif_sewa']
+            'tarif_sewa' => (float) $alat['tarif_sewa'],
         ];
     }
 
     // Buat nomor transaksi unik.
-    $noTransaksi = 'TRX-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
+    $noTransaksi = 'TRX-'.date('Ymd').'-'.strtoupper(bin2hex(random_bytes(4)));
 
     // Simpan pengajuan untuk diproses admin.
     $stmt = $conn->prepare(
@@ -166,9 +168,9 @@ try {
     $stmt->close();
 
     $stmt = $conn->prepare(
-        "INSERT INTO detail_penyewaan
+        'INSERT INTO detail_penyewaan
          (id_penyewaan, no_transaksi, kode_alat, jumlah, tarif_sewa)
-         VALUES (?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?)'
     );
 
     foreach ($detail as $item) {
@@ -191,10 +193,10 @@ try {
 
     // Catat aktivitas jika tabel activity_logs tersedia.
     try {
-        $aktivitas = 'Pelanggan mengajukan penyewaan ' . $noTransaksi;
+        $aktivitas = 'Pelanggan mengajukan penyewaan '.$noTransaksi;
         $stmt = $conn->prepare(
-            "INSERT INTO activity_logs (id_user, aktivitas)
-             VALUES (?, ?)"
+            'INSERT INTO activity_logs (id_user, aktivitas)
+             VALUES (?, ?)'
         );
         $stmt->bind_param('is', $idUser, $aktivitas);
         $stmt->execute();
@@ -208,7 +210,7 @@ try {
     response('success', 'Pengajuan penyewaan berhasil dikirim.', [
         'no_transaksi' => $noTransaksi,
         'status_penyewaan' => 'Menunggu Konfirmasi',
-        'durasi_hari' => $durasi
+        'durasi_hari' => $durasi,
     ]);
 
 } catch (Throwable $e) {

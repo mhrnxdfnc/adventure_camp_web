@@ -1,40 +1,40 @@
 <?php
 
-header("Content-Type: application/json; charset=UTF-8");
+header('Content-Type: application/json; charset=UTF-8');
 
 session_start();
-include "koneksi.php";
+include 'koneksi.php';
 
-if (!isset($_SESSION["id_user"]) || !isset($_SESSION["role"])) {
+if (! isset($_SESSION['id_user']) || ! isset($_SESSION['role'])) {
     http_response_code(401);
 
     echo json_encode([
-        "status" => "error",
-        "message" => "Silakan login terlebih dahulu"
+        'status' => 'error',
+        'message' => 'Silakan login terlebih dahulu',
     ]);
 
     exit;
 }
 
-if ($_SESSION["role"] !== "Admin") {
+if ($_SESSION['role'] !== 'Admin') {
     http_response_code(403);
 
     echo json_encode([
-        "status" => "error",
-        "message" => "Hanya Admin yang dapat menyetujui penyewaan"
+        'status' => 'error',
+        'message' => 'Hanya Admin yang dapat menyetujui penyewaan',
     ]);
 
     exit;
 }
 
-$data = json_decode(file_get_contents("php://input"), true);
+$data = json_decode(file_get_contents('php://input'), true);
 
-$no_transaksi = trim($data["no_transaksi"] ?? "");
+$no_transaksi = trim($data['no_transaksi'] ?? '');
 
-if ($no_transaksi === "") {
+if ($no_transaksi === '') {
     echo json_encode([
-        "status" => "error",
-        "message" => "Nomor transaksi wajib diisi"
+        'status' => 'error',
+        'message' => 'Nomor transaksi wajib diisi',
     ]);
 
     exit;
@@ -43,27 +43,27 @@ if ($no_transaksi === "") {
 $conn->begin_transaction();
 
 try {
-    $stmt = $conn->prepare("
+    $stmt = $conn->prepare('
         SELECT status_penyewaan
         FROM penyewaan
         WHERE no_transaksi = ?
         FOR UPDATE
-    ");
+    ');
 
-    $stmt->bind_param("s", $no_transaksi);
+    $stmt->bind_param('s', $no_transaksi);
     $stmt->execute();
 
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
-        throw new Exception("Transaksi tidak ditemukan");
+        throw new Exception('Transaksi tidak ditemukan');
     }
 
     $transaksi = $result->fetch_assoc();
 
-    if ($transaksi["status_penyewaan"] !== "Menunggu Konfirmasi") {
+    if ($transaksi['status_penyewaan'] !== 'Menunggu Konfirmasi') {
         throw new Exception(
-            "Transaksi tidak berstatus Menunggu Konfirmasi"
+            'Transaksi tidak berstatus Menunggu Konfirmasi'
         );
     }
 
@@ -73,14 +73,14 @@ try {
         WHERE no_transaksi = ?
     ");
 
-    $stmtUpdate->bind_param("s", $no_transaksi);
+    $stmtUpdate->bind_param('s', $no_transaksi);
     $stmtUpdate->execute();
 
-    $id_user = (int) $_SESSION["id_user"];
-    $aktivitas = "Menyetujui penyewaan";
-    $modul = "Penyewaan";
+    $id_user = (int) $_SESSION['id_user'];
+    $aktivitas = 'Menyetujui penyewaan';
+    $modul = 'Penyewaan';
 
-    $stmtLog = $conn->prepare("
+    $stmtLog = $conn->prepare('
         INSERT INTO activity_logs
         (
             id_user,
@@ -89,10 +89,10 @@ try {
             data_diproses
         )
         VALUES (?, ?, ?, ?)
-    ");
+    ');
 
     $stmtLog->bind_param(
-        "isss",
+        'isss',
         $id_user,
         $aktivitas,
         $modul,
@@ -104,17 +104,17 @@ try {
     $conn->commit();
 
     echo json_encode([
-        "status" => "success",
-        "message" => "Penyewaan berhasil disetujui",
-        "no_transaksi" => $no_transaksi
+        'status' => 'success',
+        'message' => 'Penyewaan berhasil disetujui',
+        'no_transaksi' => $no_transaksi,
     ]);
 
 } catch (Throwable $e) {
     $conn->rollback();
 
     echo json_encode([
-        "status" => "error",
-        "message" => $e->getMessage()
+        'status' => 'error',
+        'message' => $e->getMessage(),
     ]);
 }
 

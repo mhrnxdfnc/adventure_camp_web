@@ -38,4 +38,12 @@ class Supplier extends Model
     {
         return $this->hasMany(PembelianInventaris::class, 'id_supplier', 'id_supplier');
     }
+
+    /**
+     * Cek apakah supplier memiliki riwayat transaksi pembelian inventaris
+     */
+    public function hasPurchases(): bool
+    {
+        return $this->pembelian()->exists();
+    }
 }

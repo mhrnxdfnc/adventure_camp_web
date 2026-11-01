@@ -181,21 +181,46 @@
                 <div class="ac-card-footer bg-light p-3 border-top mt-auto">
                     @if(! $trx->pembayaran || ! $trx->pembayaran->isLunas())
                         @if($trx->isSiapDibayar())
-                            <a href="{{ route('pengguna.pembayaran.qris', $trx->no_transaksi) }}" 
-                               class="btn btn-success w-100 font-weight-bold d-flex align-items-center justify-content-center gap-2" 
-                               id="btn-lihat-instruksi-bayar-{{ $trx->no_transaksi }}">
-                                <span>💳</span>
-                                <span>Lihat Instruksi & Konfirmasi Bayar &rarr;</span>
-                            </a>
+                            <div class="d-flex flex-column gap-2">
+                                <a href="{{ route('pengguna.pembayaran.qris', $trx->no_transaksi) }}" 
+                                   class="btn btn-success w-100 font-weight-bold d-flex align-items-center justify-content-center gap-2" 
+                                   id="btn-lihat-instruksi-bayar-{{ $trx->no_transaksi }}">
+                                    <span>💳</span>
+                                    <span>Lihat Instruksi & Konfirmasi Bayar &rarr;</span>
+                                </a>
+                                <a href="{{ route('pengguna.pesanan.nota', $trx->no_transaksi) }}" 
+                                   target="_blank" 
+                                   class="btn btn-outline-dark btn-sm w-100 d-flex align-items-center justify-content-center gap-1">
+                                    <span>🖨️</span>
+                                    <span>Cetak Bukti Pemesanan</span>
+                                </a>
+                            </div>
                         @else
-                            <button class="btn btn-outline-secondary w-100" disabled>
-                                Menunggu Persetujuan Admin
-                            </button>
+                            <div class="d-flex flex-column gap-2">
+                                <button class="btn btn-outline-secondary w-100" disabled>
+                                    Menunggu Persetujuan Admin
+                                </button>
+                                <a href="{{ route('pengguna.pesanan.nota', $trx->no_transaksi) }}" 
+                                   target="_blank" 
+                                   class="btn btn-outline-dark btn-sm w-100 d-flex align-items-center justify-content-center gap-1">
+                                    <span>🖨️</span>
+                                    <span>Cetak Rincian Pesanan</span>
+                                </a>
+                            </div>
                         @endif
                     @else
-                        <div class="d-flex justify-content-between align-items-center small">
-                            <span class="text-success fw-bold">✓ Pembayaran Terverifikasi Lunas</span>
-                            <span class="text-muted font-monospace">{{ $trx->pembayaran->no_pembayaran }}</span>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex justify-content-between align-items-center small">
+                                <span class="text-success fw-bold">✓ Pembayaran Terverifikasi Lunas</span>
+                                <span class="text-muted font-monospace">{{ $trx->pembayaran->no_pembayaran }}</span>
+                            </div>
+                            <a href="{{ route('pengguna.pesanan.nota', $trx->no_transaksi) }}" 
+                               target="_blank" 
+                               class="btn btn-outline-dark btn-sm w-100 d-flex align-items-center justify-content-center gap-1"
+                               id="btn-cetak-nota-pengguna-{{ $trx->no_transaksi }}">
+                                <span>🖨️</span>
+                                <span>Cetak Nota Resmi Transaksi</span>
+                            </a>
                         </div>
                     @endif
                 </div>

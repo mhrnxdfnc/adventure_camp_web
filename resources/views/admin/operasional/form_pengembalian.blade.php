@@ -101,72 +101,106 @@
                             <tbody>
                                 @foreach($penyewaan->detailPenyewaan as $detail)
                                     @php
-                                        $qtyDisewa = $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah;
+                                        $qtyDisewa = $detail->jumlah_diserahkan > 0 ? (int) $detail->jumlah_diserahkan : (int) $detail->jumlah;
+                                        $sudahKembali = (int) $detail->jumlah_kembali_baik + (int) $detail->jumlah_perlu_perbaikan + (int) $detail->jumlah_rusak;
+                                        $sisaKembali = max(0, $qtyDisewa - $sudahKembali);
+                                        $rowKey = $detail->id_detail;
                                     @endphp
                                     <tr>
                                         <td>
                                             <strong class="text-dark d-block">{{ $detail->alat->nama_alat ?? $detail->kode_alat }}</strong>
                                             <small class="text-muted font-monospace">{{ $detail->kode_alat }} &bull; Rp {{ number_format($detail->tarif_sewa, 0, ',', '.') }}/hari</small>
+                                            @if($sudahKembali > 0)
+                                                <div class="mt-1">
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size: 0.7rem;">
+                                                        Telah kembali sebelumnya: {{ $sudahKembali }} unit
+                                                    </span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-center">
                                             <span class="badge bg-secondary-subtle text-dark border px-2 py-1 font-monospace" style="font-size: 0.85rem;">
                                                 {{ $qtyDisewa }} unit
                                             </span>
-                                            <input type="hidden" id="max-qty-{{ $detail->kode_alat }}" value="{{ $qtyDisewa }}">
+                                            @if($sisaKembali < $qtyDisewa)
+                                                <small class="text-warning d-block font-weight-bold mt-1" style="font-size: 0.72rem;">Sisa: {{ $sisaKembali }} unit</small>
+                                            @endif
+                                            <input type="hidden" id="max-qty-{{ $rowKey }}" value="{{ $sisaKembali }}">
+                                            <input type="hidden" name="items[{{ $rowKey }}][id_detail]" value="{{ $rowKey }}">
+                                            <input type="hidden" name="items[{{ $rowKey }}][kode_alat]" value="{{ $detail->kode_alat }}">
                                         </td>
-                                        <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="number" 
-                                                       name="items[{{ $detail->kode_alat }}][baik]" 
-                                                       id="item-baik-{{ $detail->kode_alat }}"
-                                                       class="form-control text-center input-kondisi-baik" 
-                                                       data-kode="{{ $detail->kode_alat }}"
-                                                       value="{{ old('items.' . $detail->kode_alat . '.baik', $qtyDisewa) }}" 
-                                                       min="0" 
-                                                       max="{{ $qtyDisewa }}" 
-                                                       required>
-                                                <span class="input-group-text text-success bg-success-subtle">✓</span>
-                                            </div>
-                                            <small class="text-success d-block text-center mt-1" style="font-size: 0.68rem;">Siap sewa</small>
-                                        </td>
-                                        <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="number" 
-                                                       name="items[{{ $detail->kode_alat }}][perlu_perbaikan]" 
-                                                       id="item-perbaikan-{{ $detail->kode_alat }}"
-                                                       class="form-control text-center input-kondisi-perbaikan" 
-                                                       data-kode="{{ $detail->kode_alat }}"
-                                                       value="{{ old('items.' . $detail->kode_alat . '.perlu_perbaikan', 0) }}" 
-                                                       min="0" 
-                                                       max="{{ $qtyDisewa }}" 
-                                                       required>
-                                                <span class="input-group-text text-warning bg-warning-subtle">🔧</span>
-                                            </div>
-                                            <small class="text-warning d-block text-center mt-1" style="font-size: 0.68rem;">Antrean servis</small>
-                                        </td>
-                                        <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="number" 
-                                                       name="items[{{ $detail->kode_alat }}][rusak]" 
-                                                       id="item-rusak-{{ $detail->kode_alat }}"
-                                                       class="form-control text-center input-kondisi-rusak" 
-                                                       data-kode="{{ $detail->kode_alat }}"
-                                                       value="{{ old('items.' . $detail->kode_alat . '.rusak', 0) }}" 
-                                                       min="0" 
-                                                       max="{{ $qtyDisewa }}" 
-                                                       required>
-                                                <span class="input-group-text text-danger bg-danger-subtle">✕</span>
-                                            </div>
-                                            <small class="text-danger d-block text-center mt-1" style="font-size: 0.68rem;">Afkir / Rusak</small>
-                                        </td>
+                                        @if($sisaKembali === 0)
+                                            <td colspan="3" class="text-center bg-light">
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+                                                    ✓ Sudah Lengkap Dikembalikan ({{ $sudahKembali }} Unit)
+                                                </span>
+                                                <input type="hidden" name="items[{{ $rowKey }}][baik]" value="0">
+                                                <input type="hidden" name="items[{{ $rowKey }}][perlu_perbaikan]" value="0">
+                                                <input type="hidden" name="items[{{ $rowKey }}][rusak]" value="0">
+                                            </td>
+                                        @else
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" 
+                                                           name="items[{{ $rowKey }}][baik]" 
+                                                           id="item-baik-{{ $rowKey }}"
+                                                           class="form-control text-center input-kondisi-baik" 
+                                                           data-key="{{ $rowKey }}"
+                                                           value="{{ old('items.' . $rowKey . '.baik', $sisaKembali) }}" 
+                                                           min="0" 
+                                                           max="{{ $sisaKembali }}" 
+                                                           required>
+                                                    <span class="input-group-text text-success bg-success-subtle">✓</span>
+                                                </div>
+                                                <small class="text-success d-block text-center mt-1" style="font-size: 0.68rem;">Siap sewa</small>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" 
+                                                           name="items[{{ $rowKey }}][perlu_perbaikan]" 
+                                                           id="item-perbaikan-{{ $rowKey }}"
+                                                           class="form-control text-center input-kondisi-perbaikan" 
+                                                           data-key="{{ $rowKey }}"
+                                                           value="{{ old('items.' . $rowKey . '.perlu_perbaikan', 0) }}" 
+                                                           min="0" 
+                                                           max="{{ $sisaKembali }}" 
+                                                           required>
+                                                    <span class="input-group-text text-warning bg-warning-subtle">🔧</span>
+                                                </div>
+                                                <small class="text-warning d-block text-center mt-1" style="font-size: 0.68rem;">Antrean servis</small>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" 
+                                                           name="items[{{ $rowKey }}][rusak]" 
+                                                           id="item-rusak-{{ $rowKey }}"
+                                                           class="form-control text-center input-kondisi-rusak" 
+                                                           data-key="{{ $rowKey }}"
+                                                           value="{{ old('items.' . $rowKey . '.rusak', 0) }}" 
+                                                           min="0" 
+                                                           max="{{ $sisaKembali }}" 
+                                                           required>
+                                                    <span class="input-group-text text-danger bg-danger-subtle">✕</span>
+                                                </div>
+                                                <small class="text-danger d-block text-center mt-1" style="font-size: 0.68rem;">Afkir / Rusak</small>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <div class="ac-card-footer bg-light p-3 small text-muted">
-                    <em>Perhatian: Total alat kembali (Baik + Perlu Perbaikan + Rusak) harus sama persis dengan jumlah alat yang disewa.</em>
+                <div class="ac-card-footer bg-light p-3 small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <em>Setiap baris alat diidentifikasi secara unik berdasarkan ID rincian transaksi sewa. Total alat kembali (Baik + Perbaikan + Rusak) tidak boleh melebihi sisa unit yang disewa.</em>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" name="pengembalian_sebagian" id="pengembalian_sebagian" value="1" {{ old('pengembalian_sebagian') ? 'checked' : '' }}>
+                        <label class="form-check-label fw-bold text-dark small" for="pengembalian_sebagian">
+                            Izinkan Pengembalian Sebagian / Bertahap
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -365,12 +399,16 @@ document.addEventListener('DOMContentLoaded', function () {
     tglAktualInput.addEventListener('change', hitungDenda);
     inputKerusakan.addEventListener('input', hitungDenda);
 
-    // Otomatis sinkronisasi input kondisi baik, perlu perbaikan, dan rusak
-    function syncKondisi(kode, sourceField) {
-        const max = parseInt(document.getElementById('max-qty-' + kode).value) || 0;
-        const inputBaik = document.getElementById('item-baik-' + kode);
-        const inputRepair = document.getElementById('item-perbaikan-' + kode);
-        const inputRusak = document.getElementById('item-rusak-' + kode);
+    // Otomatis sinkronisasi input kondisi baik, perlu perbaikan, dan rusak per baris unik
+    function syncKondisi(key, sourceField) {
+        const maxElem = document.getElementById('max-qty-' + key);
+        if (!maxElem) return;
+        const max = parseInt(maxElem.value) || 0;
+        const inputBaik = document.getElementById('item-baik-' + key);
+        const inputRepair = document.getElementById('item-perbaikan-' + key);
+        const inputRusak = document.getElementById('item-rusak-' + key);
+
+        if (!inputBaik || !inputRepair || !inputRusak) return;
 
         let baik = parseInt(inputBaik.value) || 0;
         let repair = parseInt(inputRepair.value) || 0;
@@ -415,19 +453,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('.input-kondisi-baik').forEach(function(input) {
         input.addEventListener('input', function() {
-            syncKondisi(this.getAttribute('data-kode'), 'baik');
+            syncKondisi(this.getAttribute('data-key'), 'baik');
         });
     });
 
     document.querySelectorAll('.input-kondisi-perbaikan').forEach(function(input) {
         input.addEventListener('input', function() {
-            syncKondisi(this.getAttribute('data-kode'), 'perbaikan');
+            syncKondisi(this.getAttribute('data-key'), 'perbaikan');
         });
     });
 
     document.querySelectorAll('.input-kondisi-rusak').forEach(function(input) {
         input.addEventListener('input', function() {
-            syncKondisi(this.getAttribute('data-kode'), 'rusak');
+            syncKondisi(this.getAttribute('data-key'), 'rusak');
         });
     });
 });

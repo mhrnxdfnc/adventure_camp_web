@@ -1,17 +1,17 @@
 <?php
 
-include "koneksi.php";
+include 'koneksi.php';
 
-header("Content-Type: application/json; charset=UTF-8");
+header('Content-Type: application/json; charset=UTF-8');
 
-$jenis = $_GET["jenis"] ?? "";
+$jenis = $_GET['jenis'] ?? '';
 $data = [];
 
 switch ($jenis) {
 
-    case "pelanggan":
+    case 'pelanggan':
 
-        $sql = "
+        $sql = '
             SELECT
                 id_pelanggan,
                 nama_pelanggan,
@@ -20,15 +20,14 @@ switch ($jenis) {
                 created_at
             FROM pelanggan
             ORDER BY id_pelanggan DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'alat':
 
-    case "alat":
-
-        $sql = "
+        $sql = '
             SELECT
                 kode_alat,
                 nama_alat,
@@ -39,15 +38,14 @@ switch ($jenis) {
                 created_at
             FROM alat
             ORDER BY kode_alat ASC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'penyewaan':
 
-    case "penyewaan":
-
-        $sql = "
+        $sql = '
             SELECT
                 p.no_transaksi,
                 p.tanggal_sewa,
@@ -99,17 +97,16 @@ switch ($jenis) {
                 u.nama_user
 
             ORDER BY p.tanggal_sewa DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'detail_penyewaan':
 
-    case "detail_penyewaan":
+        $no = $_GET['no_transaksi'] ?? '';
 
-        $no = $_GET["no_transaksi"] ?? "";
-
-        $stmt = $conn->prepare("
+        $stmt = $conn->prepare('
             SELECT
                 d.id_detail,
                 d.no_transaksi,
@@ -122,25 +119,24 @@ switch ($jenis) {
             JOIN alat a
                 ON d.kode_alat = a.kode_alat
             WHERE d.no_transaksi = ?
-        ");
+        ');
 
-        if (!$stmt) {
+        if (! $stmt) {
             echo json_encode([
-                "status" => "error",
-                "message" => $conn->error
+                'status' => 'error',
+                'message' => $conn->error,
             ]);
             exit;
         }
 
-        $stmt->bind_param("s", $no);
+        $stmt->bind_param('s', $no);
         $stmt->execute();
         $result = $stmt->get_result();
         break;
 
+    case 'pembayaran':
 
-    case "pembayaran":
-
-        $sql = "
+        $sql = '
             SELECT
                 b.no_pembayaran,
                 b.no_transaksi,
@@ -162,15 +158,14 @@ switch ($jenis) {
             ORDER BY
                 b.tanggal_pembayaran DESC,
                 b.no_pembayaran DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'pengembalian':
 
-    case "pengembalian":
-
-        $sql = "
+        $sql = '
             SELECT
                 pg.id_pengembalian,
                 pg.no_transaksi,
@@ -199,15 +194,14 @@ switch ($jenis) {
 
             ORDER BY
                 pg.tanggal_pengembalian_aktual DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'users':
 
-    case "users":
-
-        $sql = "
+        $sql = '
             SELECT
                 id_user,
                 nama_user,
@@ -217,15 +211,14 @@ switch ($jenis) {
                 created_at
             FROM users
             ORDER BY id_user ASC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'audit':
 
-    case "audit":
-
-        $sql = "
+        $sql = '
             SELECT
                 l.id_log,
                 u.nama_user,
@@ -238,15 +231,14 @@ switch ($jenis) {
             JOIN users u
                 ON l.id_user = u.id_user
             ORDER BY l.waktu DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'alat_terlaris':
 
-    case "alat_terlaris":
-
-        $sql = "
+        $sql = '
             SELECT
                 a.kode_alat,
                 a.nama_alat,
@@ -269,17 +261,16 @@ switch ($jenis) {
                 a.tarif_sewa
 
             ORDER BY total_disewa DESC
-        ";
+        ';
 
         $result = $conn->query($sql);
         break;
 
+    case 'penyewaan_pelanggan':
 
-    case "penyewaan_pelanggan":
+        $idPelanggan = (int) ($_GET['id_pelanggan'] ?? 0);
 
-        $idPelanggan = (int)($_GET["id_pelanggan"] ?? 0);
-
-        $stmt = $conn->prepare("
+        $stmt = $conn->prepare('
             SELECT
                 p.no_transaksi,
                 p.tanggal_sewa,
@@ -323,60 +314,53 @@ switch ($jenis) {
                 pl.nama_pelanggan
 
             ORDER BY p.tanggal_sewa DESC
-        ");
+        ');
 
-        if (!$stmt) {
+        if (! $stmt) {
             echo json_encode([
-                "status" => "error",
-                "message" => $conn->error
+                'status' => 'error',
+                'message' => $conn->error,
             ]);
             exit;
         }
 
-        $stmt->bind_param("i", $idPelanggan);
+        $stmt->bind_param('i', $idPelanggan);
         $stmt->execute();
         $result = $stmt->get_result();
         break;
 
-
     default:
 
         echo json_encode([
-            "status" => "error",
-            "message" => "Jenis data tidak valid"
+            'status' => 'error',
+            'message' => 'Jenis data tidak valid',
         ]);
         $conn->close();
         exit;
 }
 
-
-if (!$result) {
+if (! $result) {
 
     echo json_encode([
-        "status" => "error",
-        "message" => $conn->error
+        'status' => 'error',
+        'message' => $conn->error,
     ]);
 
     $conn->close();
     exit;
 }
 
-
 while ($row = $result->fetch_assoc()) {
     $data[] = $row;
 }
 
-
 echo json_encode([
-    "status" => "success",
-    "data" => $data
+    'status' => 'success',
+    'data' => $data,
 ], JSON_UNESCAPED_UNICODE);
-
 
 if (isset($stmt)) {
     $stmt->close();
 }
 
 $conn->close();
-
-?>

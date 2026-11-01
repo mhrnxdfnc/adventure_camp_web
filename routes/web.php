@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventarisController;
 use App\Http\Controllers\KatalogController;
 use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\OnsiteKioskController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\PembayaranController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\PembelianInventarisController;
 use App\Http\Controllers\PemilikDashboardController;
 use App\Http\Controllers\PemilikTransaksiController;
 use App\Http\Controllers\PenggunaPesananController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UiController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,10 +28,22 @@ use Illuminate\Support\Facades\Route;
 | Pengaturan rute publik, autentikasi tiga role, dan proteksi otorisasi.
 */
 
-// Beranda mengarahkan ke showcase komponen UI
+// Beranda mengarahkan ke dashboard masing-masing role atau login jika tamu
 Route::get('/', function () {
-    return redirect('/ui-showcase');
-});
+    if (auth()->check()) {
+        $user = auth()->user();
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
+        if ($user->isPemilik()) {
+            return redirect()->route('pemilik.dashboard');
+        }
+
+        return redirect()->route('pengguna.katalog.index');
+    }
+
+    return redirect()->route('login');
+})->name('home');
 
 // Showcase Komponen UI (Publik untuk pengujian tampilan)
 Route::get('/ui-showcase', [UiController::class, 'showcase'])->name('ui.showcase');
@@ -91,6 +105,7 @@ Route::middleware(['auth', 'role:Admin'])
         Route::get('/inventaris/{kode_alat}', [InventarisController::class, 'show'])->name('inventaris.show');
         Route::post('/inventaris/{kode_alat}/adjust', [InventarisController::class, 'adjustStock'])->name('inventaris.adjust-stock');
         Route::post('/inventaris/{kode_alat}/konfirmasi-perbaikan', [InventarisController::class, 'konfirmasiPerbaikan'])->name('inventaris.konfirmasi-perbaikan');
+        Route::post('/inventaris/{kode_alat}/tindak-kerusakan', [InventarisController::class, 'tindakKerusakan'])->name('inventaris.tindak-kerusakan');
 
         // Audit Trail & Riwayat Log Aktivitas Sistem (Admin Only)
         Route::get('/logs', [AdminLogController::class, 'index'])->name('logs.index');
@@ -98,7 +113,22 @@ Route::middleware(['auth', 'role:Admin'])
         // Manajemen Pengguna (Admin Only)
         Route::patch('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::post('/users/{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('users.reset-password');
-        Route::resource('users', AdminUserController::class)->parameters(['users' => 'user'])->except(['show']);
+        Route::resource('users', AdminUserController::class)->parameters(['users' => 'user']);
+
+        // Master Data Supplier (Admin Only)
+        Route::resource('supplier', SupplierController::class)->parameters(['supplier' => 'supplier']);
+
+        // Laporan & Rekapitulasi Eksekutif (Admin)
+        Route::get('/laporan/transaksi', [LaporanController::class, 'transaksi'])->name('laporan.transaksi');
+        Route::get('/laporan/transaksi/cetak', [LaporanController::class, 'cetakTransaksi'])->name('laporan.transaksi.cetak');
+        Route::get('/laporan/transaksi/export', [LaporanController::class, 'exportTransaksi'])->name('laporan.transaksi.export');
+
+        Route::get('/laporan/inventaris', [LaporanController::class, 'inventaris'])->name('laporan.inventaris');
+        Route::get('/laporan/inventaris/cetak', [LaporanController::class, 'cetakInventaris'])->name('laporan.inventaris.cetak');
+        Route::get('/laporan/inventaris/export', [LaporanController::class, 'exportInventaris'])->name('laporan.inventaris.export');
+
+        // Cetak Nota Transaksi Resmi (Admin)
+        Route::get('/pesanan/{no_transaksi}/nota', [LaporanController::class, 'nota'])->name('pesanan.nota');
     });
 
 // Rute Dashboard & Katalog Pengguna (Hanya untuk Role Pengguna / Pelanggan)
@@ -131,12 +161,20 @@ Route::middleware(['auth', 'role:Pengguna'])
         Route::get('/pembayaran/{no_transaksi}/transfer', [PembayaranController::class, 'showTransfer'])->name('pembayaran.transfer');
         Route::get('/pembayaran/{no_transaksi}/cash', [PembayaranController::class, 'showCash'])->name('pembayaran.cash');
         Route::post('/pembayaran/{no_transaksi}/upload-bukti', [PembayaranController::class, 'uploadBukti'])->name('pembayaran.upload-bukti');
+
+        // Cetak Nota Transaksi Pelanggan
+        Route::get('/pesanan/{no_transaksi}/nota', [LaporanController::class, 'nota'])->name('pesanan.nota');
     });
 
 // Akses Berkas Bukti Pembayaran Terproteksi (Hanya Admin atau Pengguna Pemilik Transaksi)
 Route::middleware('auth')
     ->get('/pembayaran/{no_transaksi}/bukti', [PembayaranController::class, 'lihatBukti'])
     ->name('pembayaran.bukti');
+
+// Cetak Nota Transaksi Resmi Bersama (Auth: Admin, Pemilik, dan Pelanggan Pemilik Transaksi)
+Route::middleware('auth')
+    ->get('/transaksi/{no_transaksi}/nota', [LaporanController::class, 'nota'])
+    ->name('transaksi.nota');
 
 // Rute Dashboard Pemilik (Strictly Read-Only)
 Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
@@ -145,7 +183,17 @@ Route::middleware(['auth', 'role:Pemilik', 'pemilik.readonly'])
     ->group(function () {
         Route::get('/dashboard', [PemilikDashboardController::class, 'index'])->name('dashboard');
         Route::get('/transaksi', [PemilikTransaksiController::class, 'index'])->name('transaksi.index');
+        Route::get('/transaksi/cetak', [LaporanController::class, 'cetakTransaksi'])->name('transaksi.cetak');
+        Route::get('/transaksi/export', [LaporanController::class, 'exportTransaksi'])->name('transaksi.export');
         Route::get('/transaksi/{no_transaksi}', [PemilikTransaksiController::class, 'show'])->name('transaksi.show');
+        Route::get('/transaksi/{no_transaksi}/nota', [LaporanController::class, 'nota'])->name('transaksi.nota');
+
+        Route::get('/inventaris', [PemilikDashboardController::class, 'inventaris'])->name('inventaris.index');
+        Route::get('/inventaris/cetak', [LaporanController::class, 'cetakInventaris'])->name('inventaris.cetak');
+        Route::get('/inventaris/export', [LaporanController::class, 'exportInventaris'])->name('inventaris.export');
+
+        // Audit Trail Log untuk Pemilik (Strictly Read-Only)
+        Route::get('/logs', [AdminLogController::class, 'index'])->name('logs.index');
 
         // Endpoint pengujian pencegahan perubahan data oleh Pemilik
         Route::post('/test-action', function () {

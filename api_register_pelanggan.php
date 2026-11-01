@@ -1,4 +1,5 @@
 <?php
+
 header('Content-Type: application/json; charset=UTF-8');
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
@@ -8,7 +9,7 @@ function responseJson($status, $message, $extra = [])
     echo json_encode(
         array_merge([
             'status' => $status,
-            'message' => $message
+            'message' => $message,
         ], $extra),
         JSON_UNESCAPED_UNICODE
     );
@@ -16,7 +17,7 @@ function responseJson($status, $message, $extra = [])
 }
 
 try {
-    require_once __DIR__ . '/koneksi.php';
+    require_once __DIR__.'/koneksi.php';
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -25,15 +26,15 @@ try {
 
     $data = json_decode(file_get_contents('php://input'), true);
 
-    if (!is_array($data)) {
+    if (! is_array($data)) {
         $data = $_POST;
     }
 
-    $nama = trim((string)($data['nama_pelanggan'] ?? ''));
-    $alamat = trim((string)($data['alamat'] ?? ''));
-    $telepon = trim((string)($data['nomor_telepon'] ?? ''));
-    $username = trim((string)($data['username'] ?? ''));
-    $password = (string)($data['password'] ?? '');
+    $nama = trim((string) ($data['nama_pelanggan'] ?? ''));
+    $alamat = trim((string) ($data['alamat'] ?? ''));
+    $telepon = trim((string) ($data['nomor_telepon'] ?? ''));
+    $username = trim((string) ($data['username'] ?? ''));
+    $password = (string) ($data['password'] ?? '');
 
     if (
         $nama === '' ||
@@ -114,7 +115,7 @@ try {
     $stmt->bind_param('sss', $nama, $alamat, $telepon);
     $stmt->execute();
 
-    $idPelanggan = (int)$conn->insert_id;
+    $idPelanggan = (int) $conn->insert_id;
     $stmt->close();
 
     // Hash password sebelum disimpan ke database.
@@ -142,7 +143,7 @@ try {
     );
 
     $stmt->execute();
-    $idUser = (int)$conn->insert_id;
+    $idUser = (int) $conn->insert_id;
     $stmt->close();
 
     $conn->commit();
@@ -154,10 +155,9 @@ try {
             'id_pelanggan' => $idPelanggan,
             'nama_pelanggan' => $nama,
             'username' => $username,
-            'role' => $role
-        ]
+            'role' => $role,
+        ],
     ]);
-
 
 } catch (Throwable $e) {
     if (isset($conn) && $conn instanceof mysqli) {
@@ -167,11 +167,9 @@ try {
         }
     }
 
-    error_log('api_register_pelanggan.php: ' . $e->getMessage());
+    error_log('api_register_pelanggan.php: '.$e->getMessage());
 
     http_response_code(500);
 
-    responseJson('error', 'Penyebab: ' . $e->getMessage());
+    responseJson('error', 'Penyebab: '.$e->getMessage());
 }
-
-?>

@@ -492,4 +492,154 @@ class PerhitunganBiayaSewaTest extends TestCase
         $this->assertNotNull($trx3);
         $this->assertEquals(2, $trx3->detailPenyewaan->first()->jumlah);
     }
+
+    /**
+     * Audit dan pengujian komprehensif perhitungan harga rental terpusat:
+     * - Rumus final: durasi hari = tanggal kembali - tanggal mulai
+     * - Subtotal = tarif historis x jumlah unit x durasi
+     * - Total transaksi = jumlah seluruh subtotal
+     * - Contoh Rp525.000 (Tenda 50k x 2 x 3 = 300k, Sleeping bag 25k x 3 x 3 = 225k)
+     * - Satu jenis barang, beberapa jenis barang, jumlah unit berbeda
+     * - Perubahan tarif master setelah transaksi dibuat tidak mengubah tagihan historis
+     * - Validasi tanggal tidak valid
+     * - Konsistensi angka di invoice / instruksi bayar (QRIS, Transfer, Cash), Admin, Pemilik, dan Dashboard
+     */
+    public function test_audit_perhitungan_harga_rental_terpusat_komprehensif(): void
+    {
+        // 1. Uji rumus terpusat model Penyewaan::hitungTotalBiaya & durasi
+        $this->assertEquals(0.0, Penyewaan::hitungTotalBiaya(50000, 2, 0));
+        $this->assertEquals(0.0, Penyewaan::hitungTotalBiaya(50000, 0, 3));
+        $this->assertEquals(300000.0, Penyewaan::hitungTotalBiaya(50000, 2, 3));
+        $this->assertEquals(225000.0, Penyewaan::hitungTotalBiaya(25000, 3, 3));
+        $this->assertEquals(525000.0, Penyewaan::hitungTotalBiaya(50000, 2, 3) + Penyewaan::hitungTotalBiaya(25000, 3, 3));
+
+        // 2. Uji multi-item dengan jumlah berbeda:
+        // ALT001 @ 50.000 x 1 unit x 5 hari = 250.000
+        // ALT002 @ 25.000 x 4 unit x 5 hari = 500.000
+        // ALT005 @ 15.000 x 2 unit x 5 hari = 150.000
+        // Total = 900.000
+        $sub1 = Penyewaan::hitungTotalBiaya(50000, 1, 5);
+        $sub2 = Penyewaan::hitungTotalBiaya(25000, 4, 5);
+        $sub3 = Penyewaan::hitungTotalBiaya(15000, 2, 5);
+        $this->assertEquals(250000.0, $sub1);
+        $this->assertEquals(500000.0, $sub2);
+        $this->assertEquals(150000.0, $sub3);
+        $this->assertEquals(900000.0, $sub1 + $sub2 + $sub3);
+
+        // 3. Uji single-item:
+        // ALT003 @ 40.000 x 2 unit x 4 hari = 320.000
+        $this->assertEquals(320000.0, Penyewaan::hitungTotalBiaya(40000, 2, 4));
+
+        // 4. Implementasi pemesanan nyata contoh Rp525.000
+        $user = User::where('username', 'pelanggan')->firstOrFail();
+        $admin = User::where('role', 'Admin')->firstOrFail();
+        $pemilik = User::where('role', 'Pemilik')->firstOrFail();
+
+        // Pastikan stok dan tarif master awal
+        $tenda = Alat::where('kode_alat', 'ALT001')->firstOrFail();
+        $tenda->stok = 10;
+        $tenda->tarif_sewa = 50000.00;
+        $tenda->save();
+
+        $sleepingBag = Alat::where('kode_alat', 'ALT002')->firstOrFail();
+        $sleepingBag->stok = 10;
+        $sleepingBag->tarif_sewa = 25000.00;
+        $sleepingBag->save();
+
+        KeranjangController::clear($user->id_user);
+        KeranjangController::add($user->id_user, 'ALT001', 2);
+        KeranjangController::add($user->id_user, 'ALT002', 3);
+
+        $tglSewa = Carbon::tomorrow()->addDays(20)->format('Y-m-d');
+        $tglKembali = Carbon::tomorrow()->addDays(23)->format('Y-m-d'); // 3 hari durasi kalender
+
+        $checkoutRes = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => $tglSewa,
+            'tanggal_kembali' => $tglKembali,
+            'metode_pembayaran' => 'Transfer Bank',
+        ]);
+        $checkoutRes->assertSessionHasNoErrors();
+
+        $trx = Penyewaan::with(['detailPenyewaan', 'pembayaran'])
+            ->where('id_user', $user->id_user)
+            ->latest('no_transaksi')
+            ->firstOrFail();
+
+        $this->assertEquals(3, $trx->durasi_hari);
+        $this->assertEquals(525000.0, $trx->total_biaya);
+        $this->assertEquals(525000.0, (float) $trx->pembayaran->total_biaya);
+
+        // Verifikasi snapshot pada detail
+        $dtTenda = $trx->detailPenyewaan->where('kode_alat', 'ALT001')->firstOrFail();
+        $this->assertEquals(2, $dtTenda->jumlah);
+        $this->assertEquals(50000.0, (float) $dtTenda->tarif_sewa);
+        $this->assertEquals(300000.0, $dtTenda->subtotal_biaya);
+
+        $dtSb = $trx->detailPenyewaan->where('kode_alat', 'ALT002')->firstOrFail();
+        $this->assertEquals(3, $dtSb->jumlah);
+        $this->assertEquals(25000.0, (float) $dtSb->tarif_sewa);
+        $this->assertEquals(225000.0, $dtSb->subtotal_biaya);
+
+        // 5. Uji perubahan tarif master di masa depan:
+        // Ubah tarif master ALT001 menjadi Rp999.000 dan ALT002 menjadi Rp888.000
+        $tenda->tarif_sewa = 999000.00;
+        $tenda->save();
+        $sleepingBag->tarif_sewa = 888000.00;
+        $sleepingBag->save();
+
+        // Muat ulang transaksi dari database dan pastikan tetap Rp525.000
+        $freshTrx = Penyewaan::with(['detailPenyewaan', 'pembayaran'])
+            ->where('no_transaksi', $trx->no_transaksi)
+            ->firstOrFail();
+
+        $this->assertEquals(525000.0, $freshTrx->total_biaya);
+        $this->assertEquals(300000.0, $freshTrx->detailPenyewaan->where('kode_alat', 'ALT001')->first()->subtotal_biaya);
+        $this->assertEquals(225000.0, $freshTrx->detailPenyewaan->where('kode_alat', 'ALT002')->first()->subtotal_biaya);
+
+        // 6. Setujui pesanan oleh Admin agar invoice dapat diakses oleh pelanggan
+        $this->actingAs($admin)->post(route('admin.pesanan.setujui', $trx->no_transaksi));
+
+        // 7. Uji konsistensi angka di seluruh invoice & halaman terkait:
+        // A. Invoice Transfer Bank Pengguna
+        $resTransfer = $this->actingAs($user)->get(route('pengguna.pembayaran.transfer', $trx->no_transaksi));
+        $resTransfer->assertStatus(200);
+        $resTransfer->assertSee('Rp 525.000');
+        $resTransfer->assertSee('Rp 300.000');
+        $resTransfer->assertSee('Rp 225.000');
+
+        // B. Invoice QRIS Pengguna
+        $resQris = $this->actingAs($user)->get(route('pengguna.pembayaran.qris', $trx->no_transaksi));
+        $resQris->assertStatus(200);
+        $resQris->assertSee('Rp 525.000');
+        $resQris->assertSee('Rp 300.000');
+        $resQris->assertSee('Rp 225.000');
+
+        // C. Invoice Cash Pengguna
+        $resCash = $this->actingAs($user)->get(route('pengguna.pembayaran.cash', $trx->no_transaksi));
+        $resCash->assertStatus(200);
+        $resCash->assertSee('Rp 525.000');
+        $resCash->assertSee('Rp 300.000');
+        $resCash->assertSee('Rp 225.000');
+
+        // D. Halaman Admin Pembayaran Show
+        $resAdminShow = $this->actingAs($admin)->get(route('admin.pembayaran.show', $trx->no_transaksi));
+        $resAdminShow->assertStatus(200);
+        $resAdminShow->assertSee('Rp 525.000');
+        $resAdminShow->assertSee('Rp 300.000');
+        $resAdminShow->assertSee('Rp 225.000');
+
+        // E. Halaman Pemilik Transaksi Show
+        $resPemilikShow = $this->actingAs($pemilik)->get(route('pemilik.transaksi.show', $trx->no_transaksi));
+        $resPemilikShow->assertStatus(200);
+        $resPemilikShow->assertSee('Rp 525.000');
+        $resPemilikShow->assertSee('Rp 300.000');
+        $resPemilikShow->assertSee('Rp 225.000');
+
+        // F. Riwayat Pesanan Dashboard Pengguna
+        $resDashboard = $this->actingAs($user)->get(route('pengguna.dashboard'));
+        $resDashboard->assertStatus(200);
+        $resDashboard->assertSee('Rp 525.000');
+        $resDashboard->assertSee('Rp 300.000');
+        $resDashboard->assertSee('Rp 225.000');
+    }
 }

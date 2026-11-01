@@ -68,8 +68,13 @@
                     🏕️
                 </div>
             </div>
-            <div class="ac-stat-value text-warning font-monospace">{{ $totalDialokasikanSemua }}</div>
-            <div class="ac-stat-sub">Unit di tangan penyewa aktif</div>
+            <div class="ac-stat-value text-warning font-monospace">{{ $totalSedangDisewaSemua }}</div>
+            <div class="ac-stat-sub">
+                Di tangan pelanggan
+                @if($totalDialokasikanSemua > 0)
+                    &bull; <span class="text-primary">{{ $totalDialokasikanSemua }} dialokasikan</span>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -189,12 +194,17 @@
                             @endif
                         </td>
                         <td class="text-center">
-                            @if($item->stok_dialokasikan > 0)
+                            @if($item->stok_sedang_disewa > 0)
                                 <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 font-monospace">
-                                    {{ $item->stok_dialokasikan }} unit
+                                    {{ $item->stok_sedang_disewa }} unit
                                 </span>
                             @else
                                 <span class="text-muted small">&mdash;</span>
+                            @endif
+                            @if($item->stok_dialokasikan > 0)
+                                <small class="text-muted d-block mt-1 font-monospace" style="font-size: 0.68rem;" title="Dipesan di toko/belum diambil">
+                                    ({{ $item->stok_dialokasikan }} dialokasikan)
+                                </small>
                             @endif
                         </td>
                         <td class="text-center">

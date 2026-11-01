@@ -1,9 +1,9 @@
 <?php
 
 session_start();
-require_once "koneksi.php";
+require_once 'koneksi.php';
 
-header("Content-Type: application/json; charset=UTF-8");
+header('Content-Type: application/json; charset=UTF-8');
 
 function kirimRespons($status, $message, $data = [], $httpCode = 200)
 {
@@ -11,8 +11,8 @@ function kirimRespons($status, $message, $data = [], $httpCode = 200)
 
     echo json_encode(
         array_merge([
-            "status" => $status,
-            "message" => $message
+            'status' => $status,
+            'message' => $message,
         ], $data),
         JSON_UNESCAPED_UNICODE
     );
@@ -25,25 +25,25 @@ function kirimRespons($status, $message, $data = [], $httpCode = 200)
 // ========================================
 
 if (
-    !isset($_SESSION["id_user"]) ||
-    !isset($_SESSION["role"]) ||
-    $_SESSION["role"] !== "Pelanggan"
+    ! isset($_SESSION['id_user']) ||
+    ! isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'Pelanggan'
 ) {
     kirimRespons(
-        "error",
-        "Silakan login sebagai pelanggan terlebih dahulu.",
+        'error',
+        'Silakan login sebagai pelanggan terlebih dahulu.',
         [],
         401
     );
 }
 
-$id_user = (int) $_SESSION["id_user"];
-$id_pelanggan = (int) ($_SESSION["id_pelanggan"] ?? 0);
+$id_user = (int) $_SESSION['id_user'];
+$id_pelanggan = (int) ($_SESSION['id_pelanggan'] ?? 0);
 
 if ($id_user <= 0 || $id_pelanggan <= 0) {
     kirimRespons(
-        "error",
-        "Akun pengguna tidak terhubung dengan data pelanggan.",
+        'error',
+        'Akun pengguna tidak terhubung dengan data pelanggan.',
         [],
         403
     );
@@ -53,25 +53,25 @@ if ($id_user <= 0 || $id_pelanggan <= 0) {
 // 2. BACA DATA PEMBAYARAN
 // ========================================
 
-$data = json_decode(file_get_contents("php://input"), true);
+$data = json_decode(file_get_contents('php://input'), true);
 
-if (!is_array($data)) {
-    kirimRespons("error", "Data pembayaran tidak valid.", [], 400);
+if (! is_array($data)) {
+    kirimRespons('error', 'Data pembayaran tidak valid.', [], 400);
 }
 
-$no_transaksi = trim((string) ($data["no_transaksi"] ?? ""));
-$jumlahInput = $data["jumlah_pembayaran"] ?? null;
-$metode = trim((string) ($data["metode_pembayaran"] ?? ""));
+$no_transaksi = trim((string) ($data['no_transaksi'] ?? ''));
+$jumlahInput = $data['jumlah_pembayaran'] ?? null;
+$metode = trim((string) ($data['metode_pembayaran'] ?? ''));
 
 if (
-    $no_transaksi === "" ||
-    !is_numeric($jumlahInput) ||
+    $no_transaksi === '' ||
+    ! is_numeric($jumlahInput) ||
     (float) $jumlahInput <= 0 ||
-    $metode === ""
+    $metode === ''
 ) {
     kirimRespons(
-        "error",
-        "Nomor transaksi, jumlah pembayaran, dan metode pembayaran wajib diisi.",
+        'error',
+        'Nomor transaksi, jumlah pembayaran, dan metode pembayaran wajib diisi.',
         [],
         400
     );
@@ -79,12 +79,12 @@ if (
 
 $jumlah_pembayaran = (float) $jumlahInput;
 
-$metodeDiizinkan = ["Transfer Bank", "QRIS"];
+$metodeDiizinkan = ['Transfer Bank', 'QRIS'];
 
-if (!in_array($metode, $metodeDiizinkan, true)) {
+if (! in_array($metode, $metodeDiizinkan, true)) {
     kirimRespons(
-        "error",
-        "Metode pembayaran harus Transfer Bank atau QRIS.",
+        'error',
+        'Metode pembayaran harus Transfer Bank atau QRIS.',
         [],
         400
     );
@@ -126,23 +126,23 @@ try {
         FOR UPDATE
     ");
 
-    $stmt->bind_param("si", $no_transaksi, $id_pelanggan);
+    $stmt->bind_param('si', $no_transaksi, $id_pelanggan);
     $stmt->execute();
 
     $transaksi = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if (!$transaksi) {
+    if (! $transaksi) {
         throw new Exception(
-            "Transaksi tidak ditemukan, bukan milik Anda, atau belum disetujui untuk pembayaran."
+            'Transaksi tidak ditemukan, bukan milik Anda, atau belum disetujui untuk pembayaran.'
         );
     }
 
-    $total = (float) $transaksi["total"];
+    $total = (float) $transaksi['total'];
 
     if ($total <= 0) {
         throw new Exception(
-            "Total tagihan tidak valid. Silakan hubungi Admin."
+            'Total tagihan tidak valid. Silakan hubungi Admin.'
         );
     }
 
@@ -152,24 +152,24 @@ try {
 
     // Semua pembayaran yang sudah tercatat ikut dihitung,
     // termasuk yang masih menunggu verifikasi.
-    $stmtCek = $conn->prepare("
+    $stmtCek = $conn->prepare('
         SELECT COALESCE(SUM(jumlah_pembayaran), 0) AS total_dibayar
         FROM pembayaran
         WHERE no_transaksi = ?
-    ");
+    ');
 
-    $stmtCek->bind_param("s", $no_transaksi);
+    $stmtCek->bind_param('s', $no_transaksi);
     $stmtCek->execute();
 
     $dataPembayaran = $stmtCek->get_result()->fetch_assoc();
     $stmtCek->close();
 
-    $total_dibayar = (float) ($dataPembayaran["total_dibayar"] ?? 0);
+    $total_dibayar = (float) ($dataPembayaran['total_dibayar'] ?? 0);
     $sisa_tagihan = max(0, $total - $total_dibayar);
 
     if ($sisa_tagihan <= 0) {
         throw new Exception(
-            "Tagihan sudah terbayar seluruhnya. Tidak ada sisa tagihan."
+            'Tagihan sudah terbayar seluruhnya. Tidak ada sisa tagihan.'
         );
     }
 
@@ -179,9 +179,9 @@ try {
 
     if ($jumlah_pembayaran > $sisa_tagihan) {
         throw new Exception(
-            "Nominal pembayaran melebihi sisa tagihan Rp" .
-            number_format($sisa_tagihan, 0, ",", ".") .
-            ". Silakan masukkan nominal yang benar."
+            'Nominal pembayaran melebihi sisa tagihan Rp'.
+            number_format($sisa_tagihan, 0, ',', '.').
+            '. Silakan masukkan nominal yang benar.'
         );
     }
 
@@ -189,29 +189,29 @@ try {
     // 6. BUAT NOMOR PEMBAYARAN
     // ========================================
 
-    $prefix = "PAY-" . date("Ymd") . "-";
+    $prefix = 'PAY-'.date('Ymd').'-';
 
-    $stmtLast = $conn->prepare("
+    $stmtLast = $conn->prepare('
         SELECT no_pembayaran
         FROM pembayaran
         WHERE no_pembayaran LIKE ?
         ORDER BY no_pembayaran DESC
         LIMIT 1
-    ");
+    ');
 
-    $like = $prefix . "%";
-    $stmtLast->bind_param("s", $like);
+    $like = $prefix.'%';
+    $stmtLast->bind_param('s', $like);
     $stmtLast->execute();
 
     $resultLast = $stmtLast->get_result();
     $urutan = 1;
 
     if ($resultLast->num_rows > 0) {
-        $last = $resultLast->fetch_assoc()["no_pembayaran"];
+        $last = $resultLast->fetch_assoc()['no_pembayaran'];
 
         $bagianAkhir = substr(
             $last,
-            strrpos($last, "-") + 1
+            strrpos($last, '-') + 1
         );
 
         $urutan = ((int) $bagianAkhir) + 1;
@@ -219,10 +219,10 @@ try {
 
     $stmtLast->close();
 
-    $no_pembayaran = $prefix . str_pad(
+    $no_pembayaran = $prefix.str_pad(
         (string) $urutan,
         3,
-        "0",
+        '0',
         STR_PAD_LEFT
     );
 
@@ -231,9 +231,9 @@ try {
     // ========================================
 
     // Pembayaran tetap perlu diverifikasi oleh Admin.
-    $status = "Menunggu Verifikasi";
+    $status = 'Menunggu Verifikasi';
 
-    $stmtInsert = $conn->prepare("
+    $stmtInsert = $conn->prepare('
         INSERT INTO pembayaran (
             no_pembayaran,
             no_transaksi,
@@ -243,10 +243,10 @@ try {
             status_pembayaran
         )
         VALUES (?, ?, ?, ?, ?, ?)
-    ");
+    ');
 
     $stmtInsert->bind_param(
-        "ssddss",
+        'ssddss',
         $no_pembayaran,
         $no_transaksi,
         $total,
@@ -262,10 +262,10 @@ try {
     // 8. CATAT AKTIVITAS
     // ========================================
 
-    $aktivitas = "Mencatat pembayaran";
-    $modul = "Pembayaran";
+    $aktivitas = 'Mencatat pembayaran';
+    $modul = 'Pembayaran';
 
-    $stmtLog = $conn->prepare("
+    $stmtLog = $conn->prepare('
         INSERT INTO activity_logs (
             id_user,
             aktivitas,
@@ -273,10 +273,10 @@ try {
             data_diproses
         )
         VALUES (?, ?, ?, ?)
-    ");
+    ');
 
     $stmtLog->bind_param(
-        "isss",
+        'isss',
         $id_user,
         $aktivitas,
         $modul,
@@ -296,17 +296,17 @@ try {
     $conn->commit();
 
     kirimRespons(
-        "success",
-        "Pembayaran berhasil dicatat dan menunggu verifikasi Admin.",
+        'success',
+        'Pembayaran berhasil dicatat dan menunggu verifikasi Admin.',
         [
-            "no_pembayaran" => $no_pembayaran,
-            "no_transaksi" => $no_transaksi,
-            "total_biaya" => $total,
-            "total_dibayar_sebelumnya" => $total_dibayar,
-            "jumlah_pembayaran" => $jumlah_pembayaran,
-            "total_dibayar" => $total_dibayar_baru,
-            "sisa_tagihan" => $sisa_setelah_bayar,
-            "status_pembayaran" => $status
+            'no_pembayaran' => $no_pembayaran,
+            'no_transaksi' => $no_transaksi,
+            'total_biaya' => $total,
+            'total_dibayar_sebelumnya' => $total_dibayar,
+            'jumlah_pembayaran' => $jumlah_pembayaran,
+            'total_dibayar' => $total_dibayar_baru,
+            'sisa_tagihan' => $sisa_setelah_bayar,
+            'status_pembayaran' => $status,
         ]
     );
 
@@ -317,10 +317,10 @@ try {
         // Abaikan jika transaksi sudah tidak aktif.
     }
 
-    error_log("api_post_pembayaran.php: " . $e->getMessage());
+    error_log('api_post_pembayaran.php: '.$e->getMessage());
 
     kirimRespons(
-        "error",
+        'error',
         $e->getMessage(),
         [],
         400

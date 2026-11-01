@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Alat;
+use App\Models\DetailPenyewaan;
+use App\Models\Pelanggan;
 use App\Models\Penyewaan;
 use App\Models\Supplier;
 use App\Models\User;
@@ -163,5 +165,145 @@ class PembelianSupplierTest extends TestCase
         $this->actingAs($pemilik)->get(route('admin.inventaris.pembelian.index'))->assertStatus(403);
         $this->actingAs($pemilik)->get(route('admin.inventaris.pembelian.create'))->assertStatus(403);
         $this->actingAs($pemilik)->post(route('admin.inventaris.pembelian.store'), [])->assertStatus(403);
+    }
+
+    /**
+     * Menu Pembelian Inventaris tersedia di sidebar Admin dan tidak tampil pada Pengguna / Pemilik
+     */
+    public function test_admin_sidebar_has_pembelian_inventaris_menu(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $pemilik = User::where('username', 'pemilik')->first();
+        $pengguna = User::where('username', 'pelanggan')->first();
+
+        $adminResp = $this->actingAs($admin)->get(route('admin.inventaris.index'));
+        $adminResp->assertStatus(200);
+        $adminResp->assertSee('Pembelian Inventaris');
+        $adminResp->assertSee(route('admin.inventaris.pembelian.index'));
+
+        $pemilikResp = $this->actingAs($pemilik)->get(route('pemilik.dashboard'));
+        $pemilikResp->assertStatus(200);
+        $pemilikResp->assertDontSee('menu-admin-pembelian-inventaris');
+
+        $penggunaResp = $this->actingAs($pengguna)->get(route('pengguna.dashboard'));
+        $penggunaResp->assertStatus(200);
+        $penggunaResp->assertDontSee('menu-admin-pembelian-inventaris');
+    }
+
+    /**
+     * Tombol beli stok supplier tersedia di halaman detail inventaris dan melakukan pra-pilih alat
+     */
+    public function test_admin_can_access_purchase_form_from_inventory_detail_with_preselected_tool(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $alat = Alat::first();
+
+        // 1. Periksa tombol di halaman detail inventaris
+        $detailResp = $this->actingAs($admin)->get(route('admin.inventaris.show', $alat->kode_alat));
+        $detailResp->assertStatus(200);
+        $detailResp->assertSee('Beli Stok via PO Supplier');
+        $detailResp->assertSee(route('admin.inventaris.pembelian.create', ['kode_alat' => $alat->kode_alat]));
+
+        // 2. Buka form create dengan parameter query kode_alat
+        $createResp = $this->actingAs($admin)->get(route('admin.inventaris.pembelian.create', ['kode_alat' => $alat->kode_alat]));
+        $createResp->assertStatus(200);
+        $createResp->assertSee('value="'.$alat->kode_alat.'" selected', false);
+    }
+
+    /**
+     * Stok sedang disewa tidak pernah bernilai negatif meskipun terdapat anomali pengembalian berlebih
+     */
+    public function test_stok_sedang_disewa_never_evaluates_to_negative_on_anomalous_data(): void
+    {
+        $alat = Alat::create([
+            'kode_alat' => 'ALT-TEST-CLAMP',
+            'nama_alat' => 'Tenda Dome Uji Negatif',
+            'kategori' => 'Tenda',
+            'stok' => 5,
+            'tarif_sewa' => 50000,
+            'kondisi' => 'Baik',
+        ]);
+
+        $pelanggan = Pelanggan::first() ?? Pelanggan::create([
+            'nama_pelanggan' => 'Tester Pelanggan',
+            'no_telepon' => '08123456789',
+            'alamat' => 'Yogyakarta',
+        ]);
+
+        $penyewaan = Penyewaan::create([
+            'no_transaksi' => 'TRX-TEST-CLAMP-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'tanggal_sewa' => now()->toDateString(),
+            'tanggal_kembali' => now()->addDays(2)->toDateString(),
+            'total_biaya' => 100000,
+            'status_penyewaan' => 'Sedang Disewa',
+            'sumber_pesanan' => 'online',
+        ]);
+
+        // Simulasikan anomali baris pengembalian: diserahkan 2 unit tapi tercatat kembali 5 unit
+        DetailPenyewaan::create([
+            'no_transaksi' => $penyewaan->no_transaksi,
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 2,
+            'tarif_sewa' => 50000,
+            'jumlah_diserahkan' => 2,
+            'jumlah_kembali_baik' => 5, // melebihi kuantitas diserahkan
+            'jumlah_perlu_perbaikan' => 0,
+            'jumlah_rusak' => 0,
+        ]);
+
+        // Pastikan accessor getStokSedangDisewaAttribute() mengembalikan 0 (BUKAN negatif)
+        $this->assertEquals(0, $alat->fresh()->stok_sedang_disewa);
+
+        // Pastikan getRingkasanInventaris() tidak bernilai negatif
+        $ringkasan = Alat::getRingkasanInventaris();
+        $this->assertGreaterThanOrEqual(0, $ringkasan['stok_sedang_disewa']);
+
+        // Pastikan getDaftarInventarisLengkap() mengembalikan nilai >= 0
+        $daftar = Alat::getDaftarInventarisLengkap();
+        $item = $daftar->where('kode_alat', $alat->kode_alat)->first();
+        $this->assertNotNull($item);
+        $this->assertEquals(0, $item->stok_sedang_disewa);
+    }
+
+    /**
+     * Pesanan dengan status Siap Diambil tidak dihitung sebagai sedang disewa di lapangan
+     */
+    public function test_uncollected_order_is_not_counted_in_stok_sedang_disewa(): void
+    {
+        $alat = Alat::create([
+            'kode_alat' => 'ALT-TEST-SIAP',
+            'nama_alat' => 'Carrier Uji Siap Diambil',
+            'kategori' => 'Tas & Carrier',
+            'stok' => 4,
+            'tarif_sewa' => 35000,
+            'kondisi' => 'Baik',
+        ]);
+
+        $pelanggan = Pelanggan::first();
+
+        // Buat pesanan status Siap Diambil (belum diserahkan/belum ada pengambilan)
+        $penyewaan = Penyewaan::create([
+            'no_transaksi' => 'TRX-TEST-SIAP-001',
+            'id_pelanggan' => $pelanggan->id_pelanggan,
+            'tanggal_sewa' => now()->toDateString(),
+            'tanggal_kembali' => now()->addDays(2)->toDateString(),
+            'total_biaya' => 70000,
+            'status_penyewaan' => 'Siap Diambil',
+            'sumber_pesanan' => 'online',
+        ]);
+
+        DetailPenyewaan::create([
+            'no_transaksi' => $penyewaan->no_transaksi,
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 2,
+            'tarif_sewa' => 35000,
+        ]);
+
+        // Sedang disewa harus 0 (karena belum diserahkan ke pelanggan)
+        $this->assertEquals(0, $alat->fresh()->stok_sedang_disewa);
+
+        // Stok dialokasikan di toko harus 2 unit
+        $this->assertEquals(2, $alat->fresh()->stok_dialokasikan);
     }
 }

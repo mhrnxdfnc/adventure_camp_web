@@ -35,6 +35,18 @@
                     </svg>
                     <span>Riwayat Transaksi</span>
                 </a>
+                <a href="{{ route('pemilik.inventaris.index') }}" class="ac-menu-item {{ request()->routeIs('pemilik.inventaris.*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <span>Laporan Inventaris</span>
+                </a>
+                <a href="{{ route('pemilik.logs.index') }}" class="ac-menu-item {{ request()->routeIs('pemilik.logs.*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span>Audit Trail Log</span>
+                </a>
             @else
                 <a href="{{ route('pengguna.dashboard') }}" class="ac-menu-item {{ request()->routeIs('pengguna.dashboard') ? 'active' : '' }}">
                     <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -70,7 +82,21 @@
                     <span>Kelola Data Alat</span>
                 </a>
 
-                <a href="{{ route('admin.inventaris.index') }}" class="ac-menu-item {{ request()->routeIs('admin.inventaris.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.supplier.index') }}" class="ac-menu-item {{ request()->routeIs('admin.supplier.*') ? 'active' : '' }}">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <span>Master Supplier</span>
+                </a>
+
+                <a href="{{ route('admin.inventaris.pembelian.index') }}" class="ac-menu-item {{ request()->routeIs('admin.inventaris.pembelian.*') ? 'active' : '' }}" id="menu-admin-pembelian-inventaris">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                    </svg>
+                    <span>Pembelian Inventaris</span>
+                </a>
+
+                <a href="{{ route('admin.inventaris.index') }}" class="ac-menu-item {{ request()->routeIs('admin.inventaris.*') && !request()->routeIs('admin.inventaris.pembelian.*') ? 'active' : '' }}">
                     <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                     </svg>
@@ -110,6 +136,22 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                     </svg>
                     <span>Manajemen Pengguna</span>
+                </a>
+
+                <div class="ac-menu-category">Laporan & Rekapitulasi</div>
+
+                <a href="{{ route('admin.laporan.transaksi') }}" class="ac-menu-item {{ request()->routeIs('admin.laporan.transaksi*') ? 'active' : '' }}" id="menu-admin-laporan-transaksi">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span>Laporan Transaksi & Keuangan</span>
+                </a>
+
+                <a href="{{ route('admin.laporan.inventaris') }}" class="ac-menu-item {{ request()->routeIs('admin.laporan.inventaris*') ? 'active' : '' }}" id="menu-admin-laporan-inventaris">
+                    <svg class="ac-menu-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span>Laporan Inventaris & Mutasi</span>
                 </a>
             @elseif(Auth::user()->isPengguna())
                 <div class="ac-menu-category">Layanan Sewa</div>

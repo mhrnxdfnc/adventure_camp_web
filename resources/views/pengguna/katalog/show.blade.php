@@ -1,270 +1,428 @@
 @extends('layouts.app')
 
-@section('title', $alat->nama_alat . ' — Detail Alat')
+@section('title', $alat->nama_alat . ' — Detail Perlengkapan')
 @section('page-title', 'Detail Perlengkapan Camping')
 
 @section('content')
-<div class="mb-3">
+<!-- Navigasi & Breadcrumb -->
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <a href="{{ route('pengguna.katalog.index') }}" class="btn btn-sm btn-ac-outline d-inline-flex align-items-center gap-1">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
         </svg>
         <span>Kembali ke Katalog</span>
     </a>
+
+    <a href="{{ route('pengguna.keranjang.index') }}" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        <span>Lihat Keranjang &amp; Lanjutkan Pesanan &rarr;</span>
+    </a>
 </div>
 
+@php
+    $icon = match(strtolower($alat->kategori)) {
+        'tenda' => '⛺',
+        'sleeping bag' => '🛏️',
+        'tas carrier', 'tas' => '🎒',
+        'lampu & lentera', 'lampu' => '🔦',
+        'alat masak', 'masak' => '🍳',
+        'matras' => '🧘',
+        'sepatu' => '🥾',
+        default => '🏕️',
+    };
+    $isLayakSewa = ($alat->kondisi === 'Baik');
+    $isStokTersedia = ($alat->stok > 0);
+    $canRent = ($isLayakSewa && $isStokTersedia);
+@endphp
+
 <div class="row g-4">
-    <!-- Kolom Kiri: Kartu Rincian Alat -->
+    <!-- Kolom Kiri: Ilustrasi Visual & Informasi Produk Aktual -->
     <div class="col-12 col-lg-7">
-        <div class="ac-card">
+        <div class="ac-card h-100 d-flex flex-column">
             <div class="ac-card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="badge bg-secondary font-monospace">{{ $alat->kode_alat }}</span>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">{{ $alat->kategori }}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary font-monospace" style="font-size:0.8rem;">{{ $alat->kode_alat }}</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.8rem;">{{ $alat->kategori }}</span>
                 </div>
                 <x-status-badge :status="$alat->kondisi" />
             </div>
 
-            <div class="ac-card-body">
-                <div class="d-flex align-items-center gap-3 mb-4">
-                    <div style="width:64px; height:64px; border-radius:12px; background:var(--ac-accent-soft); display:flex; align-items:center; justify-content:center; font-size:2rem;">
-                        🏕️
+            <div class="ac-card-body flex-grow-1">
+                <!-- Area Ilustrasi Visual Produk -->
+                <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border mb-4">
+                    <div style="width:72px; height:72px; border-radius:14px; background:var(--ac-accent-soft); display:flex; align-items:center; justify-content:center; font-size:2.4rem; flex-shrink:0;">
+                        {{ $icon }}
                     </div>
                     <div>
-                        <h2 class="font-weight-bold mb-1" style="color:var(--ac-primary); font-size:1.5rem;">
+                        <h2 class="font-weight-bold mb-1" style="color:var(--ac-primary); font-size:1.4rem;">
                             {{ $alat->nama_alat }}
                         </h2>
                         <span class="text-muted small">Kategori: {{ $alat->kategori }}</span>
                     </div>
                 </div>
 
+                <!-- Informasi Ringkasan Aktual dari Database -->
                 <div class="p-3 bg-light rounded-3 mb-4 border">
                     <div class="row text-center g-2">
                         <div class="col-4 border-end">
-                            <small class="text-muted d-block">Tarif Sewa</small>
-                            <strong class="text-success" style="font-size:1.15rem;">{{ $alat->formatted_tarif }}</strong>
-                            <small class="text-muted d-block" style="font-size:0.75rem;">/ 24 jam</small>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">Tarif Sewa</small>
+                            <strong class="text-success" style="font-size:1.15rem;">Rp {{ number_format($alat->tarif_sewa, 0, ',', '.') }}</strong>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">/ unit / hari</small>
                         </div>
                         <div class="col-4 border-end">
-                            <small class="text-muted d-block">Stok Siap Sewa</small>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">Stok Tersedia</small>
                             <strong class="text-dark" style="font-size:1.15rem;">{{ $alat->stok }} Unit</strong>
-                            <small class="text-success d-block" style="font-size:0.75rem;">Tersedia Fisik</small>
+                            @if(isset($alat->stok_tersedia_hari_ini) && $alat->stok_tersedia_hari_ini < $alat->stok)
+                                <small class="text-warning-emphasis d-block" style="font-size:0.75rem;">{{ $alat->stok_tersedia_hari_ini }} Siap Hari Ini</small>
+                            @elseif($isStokTersedia)
+                                <small class="text-success d-block" style="font-size:0.75rem;">Tersedia Fisik</small>
+                            @else
+                                <small class="text-danger d-block" style="font-size:0.75rem;">Habis</small>
+                            @endif
                         </div>
                         <div class="col-4">
-                            <small class="text-muted d-block">Kondisi Fisik</small>
-                            <strong class="text-success" style="font-size:1.15rem;">{{ $alat->kondisi }}</strong>
-                            <small class="text-muted d-block" style="font-size:0.75rem;">Layak Pakai</small>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">Kondisi Alat</small>
+                            <strong class="{{ $isLayakSewa ? 'text-success' : 'text-danger' }}" style="font-size:1.15rem;">{{ $alat->kondisi }}</strong>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">{{ $isLayakSewa ? 'Layak Sewa' : 'Tidak Layak' }}</small>
                         </div>
                     </div>
                 </div>
 
-                <h5 class="font-weight-bold mb-2" style="font-size:1rem;">Informasi & Ketentuan Penyewaan:</h5>
+                <!-- Rincian Identitas Produk Berdasarkan Data Aktual -->
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width: 140px;">Kode Produk</td>
+                                <td class="font-monospace fw-bold">{{ $alat->kode_alat }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Nama Perlengkapan</td>
+                                <td class="fw-bold">{{ $alat->nama_alat }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Kategori</td>
+                                <td>{{ $alat->kategori }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Kondisi Fisik</td>
+                                <td><x-status-badge :status="$alat->kondisi" /></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Ketersediaan Stok</td>
+                                <td>
+                                    @if($canRent)
+                                        <span class="text-success fw-bold">{{ $alat->stok }} unit siap disewa</span>
+                                        @if(isset($alat->stok_tersedia_hari_ini) && $alat->stok_tersedia_hari_ini < $alat->stok)
+                                            <span class="text-muted small">({{ $alat->stok_tersedia_hari_ini }} unit tersedia hari ini)</span>
+                                        @endif
+                                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">* Ketersediaan final disesuaikan otomatis dengan tanggal sewa dan pengembalian yang Anda tentukan di checkout.</small>
+                                    @elseif(! $isStokTersedia)
+                                        <span class="text-danger fw-bold">Stok sedang habis</span>
+                                    @else
+                                        <span class="text-warning fw-bold">Sedang tidak layak sewa</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Tarif Sewa Harian</td>
+                                <td class="text-success fw-bold">Rp {{ number_format($alat->tarif_sewa, 0, ',', '.') }} / unit / hari</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Ketentuan Penyewaan Singkat dan Jelas -->
+                <h5 class="font-weight-bold mb-2" style="font-size:0.95rem;">Ketentuan Penyewaan:</h5>
                 <ul class="text-muted small ps-3 mb-0" style="line-height:1.7;">
-                    <li>Perhitungan sewa dihitung per hari (24 jam) sejak serah terima alat di basecamp.</li>
-                    <li>Pemeriksaan fisik alat dilakukan bersama saat serah terima pengambilan dan pengembalian.</li>
-                    <li>Keterlambatan pengembalian atau kerusakan alat saat pemakaian akan dikenakan denda sesuai SOP.</li>
-                    <li>Alat ini wajib dijaga kebersihan dan kelengkapannya selama masa sewa.</li>
+                    <li>Pemeriksaan kondisi fisik alat dilakukan bersama saat serah terima di toko.</li>
+                    <li>Pelanggan wajib menjaga kebersihan dan kelengkapan unit selama masa penyewaan.</li>
+                    <li>Durasi dan tanggal pemakaian ditentukan bersama untuk seluruh isi keranjang saat checkout.</li>
                 </ul>
             </div>
         </div>
     </div>
 
-    <!-- Kolom Kanan: Aksi & Informasi Pemesanan -->
+    <!-- Kolom Kanan: Aksi Penambahan ke Keranjang Belanja -->
     <div class="col-12 col-lg-5">
-        <div class="ac-card">
+        <div class="ac-card h-100 d-flex flex-column">
             <div class="ac-card-header">
-                <h3 class="ac-card-title">Penyewaan Alat</h3>
+                <h3 class="ac-card-title mb-0" style="font-size:1.15rem;">Tambah ke Keranjang</h3>
             </div>
-            <div class="ac-card-body">
-                @if($alat->isSiapSewa())
-                    <div class="alert alert-success d-flex align-items-center gap-2 mb-3 py-2 px-3 small border-0" style="border-radius:8px;">
-                        <span>✅</span>
-                        <div>Alat ini <strong>siap disewa</strong> dengan ketersediaan fisik sebanyak {{ $alat->stok }} unit.</div>
-                    </div>
 
-                    <div class="mb-3">
-                        <label class="form-label font-weight-bold small">Tarif Dasar:</label>
-                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
-                            <span class="text-muted">1 Unit / Hari</span>
-                            <strong>{{ $alat->formatted_tarif }}</strong>
+            <div class="ac-card-body flex-grow-1 d-flex flex-column justify-content-between">
+                <div>
+                    <!-- Status Kesiapan Sewa -->
+                    @if($canRent)
+                        <div class="alert alert-success d-flex align-items-center gap-2 mb-4 py-2 px-3 small border-0" style="border-radius:8px;">
+                            <span>✅</span>
+                            <div>Alat ini <strong>siap disewa</strong> dengan stok fisik sebanyak {{ $alat->stok }} unit.</div>
                         </div>
+                    @elseif(! $isStokTersedia)
+                        <div class="alert alert-danger d-flex align-items-center gap-2 mb-4 py-2 px-3 small border-0" style="border-radius:8px;">
+                            <span>⚠️</span>
+                            <div>Stok peralatan ini sedang <strong>habis</strong> dan tidak dapat ditambahkan ke keranjang.</div>
+                        </div>
+                    @else
+                        <div class="alert alert-warning d-flex align-items-center gap-2 mb-4 py-2 px-3 small border-0" style="border-radius:8px;">
+                            <span>⚠️</span>
+                            <div>Peralatan ini sedang <strong>dalam perbaikan atau tidak layak pakai</strong>.</div>
+                        </div>
+                    @endif
+
+                    <!-- Tarif Harian -->
+                    <div class="p-3 bg-light rounded-3 mb-4 border">
+                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                            <span class="text-muted small">Tarif Sewa:</span>
+                            <strong class="text-success" style="font-size:1.25rem;">
+                                Rp {{ number_format($alat->tarif_sewa, 0, ',', '.') }}
+                                <span class="text-muted small fw-normal" style="font-size:0.85rem;">/ unit / hari</span>
+                            </strong>
+                        </div>
+                        <small class="text-muted d-block">
+                            * Durasi pemakaian diatur secara terpadu untuk seluruh barang saat checkout di keranjang belanja.
+                        </small>
                     </div>
 
-                    <!-- Aksi Tambah ke Keranjang Belanja -->
-                    <div class="p-3 bg-light rounded-3 mb-3 border">
-                        <label class="form-label font-weight-bold small d-flex justify-content-between mb-2">
-                            <span>Tambah ke Keranjang Belanja</span>
-                            <span class="text-muted fw-normal">Maks. {{ $alat->stok }} unit</span>
-                        </label>
-                        <form action="{{ route('pengguna.keranjang.tambah') }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="kode_alat" value="{{ $alat->kode_alat }}">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="input-group" style="max-width: 130px;">
-                                    <button type="button" class="btn btn-outline-secondary" onclick="stepCartQty(-1, {{ $alat->stok }})">-</button>
-                                    <input type="number" name="jumlah" id="inputCartJumlah" class="form-control text-center font-weight-bold" value="1" min="1" max="{{ $alat->stok }}" required>
-                                    <button type="button" class="btn btn-outline-secondary" onclick="stepCartQty(1, {{ $alat->stok }})">+</button>
-                                </div>
-                                <button type="submit" class="btn btn-ac-primary flex-grow-1 font-weight-bold d-flex align-items-center justify-content-center gap-1">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                    </svg>
-                                    <span>+ Tambah ke Keranjang</span>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <div class="d-flex align-items-center my-3 text-muted">
-                        <hr class="flex-grow-1">
-                        <span class="px-2 small text-uppercase" style="font-size:0.7rem; letter-spacing:0.05em;">Atau Pesan Langsung Satuan</span>
-                        <hr class="flex-grow-1">
-                    </div>
-
-                    <form action="{{ route('pengguna.pesanan.store') }}" method="POST" id="formPemesananAlat">
+                    <!-- Form Tambah ke Keranjang Belanja dengan Kontrol Kuantitas Konsisten -->
+                    <form action="{{ route('pengguna.keranjang.tambah') }}" method="POST" id="formAddToCartDetail">
                         @csrf
                         <input type="hidden" name="kode_alat" value="{{ $alat->kode_alat }}">
 
-                        <!-- Input Jumlah Unit -->
-                        <div class="mb-3">
-                            <label class="form-label font-weight-bold small d-flex justify-content-between">
-                                <span>Jumlah Unit Disewa <span class="text-danger">*</span></span>
-                                <span class="text-muted fw-normal">Maks. {{ $alat->stok }} unit</span>
+                        <div class="mb-4">
+                            <label class="form-label font-weight-bold small d-flex justify-content-between mb-2">
+                                <span>Pilih Jumlah Unit:</span>
+                                <span class="text-muted fw-normal">Tersedia: {{ $alat->stok }} unit</span>
                             </label>
+
+                            @php
+                                $maxRentableDetail = $alat->kapasitas_total ?? $alat->stok;
+                            @endphp
+
                             <div class="input-group">
-                                <button type="button" class="btn btn-outline-secondary" onclick="ubahJumlah(-1)">-</button>
-                                <input type="number" name="jumlah" id="inputJumlah" class="form-control text-center font-weight-bold" value="1" min="1" max="{{ $alat->stok }}" required onchange="hitungRingkasan()">
-                                <button type="button" class="btn btn-outline-secondary" onclick="ubahJumlah(1)">+</button>
+                                <button type="button" 
+                                        class="btn btn-outline-secondary" 
+                                        id="btnDetailMinus" 
+                                        onclick="stepDetailQty(-1, {{ $maxRentableDetail }})" 
+                                        disabled>-</button>
+                                <input type="number" 
+                                       name="jumlah" 
+                                       id="inputDetailJumlah" 
+                                       class="form-control text-center font-weight-bold fs-5" 
+                                       value="0" 
+                                       min="0" 
+                                       max="{{ $maxRentableDetail }}" 
+                                       autocomplete="off" 
+                                       required 
+                                       {{ ! $canRent ? 'disabled' : '' }}
+                                       oninput="validateDetailQtyInput({{ $maxRentableDetail }})"
+                                       onblur="if(this.value === '' || isNaN(parseInt(this.value)) || parseInt(this.value) < 0) { this.value = 0; } updateDetailControlState(parseInt(this.value) || 0, {{ $maxRentableDetail }});">
+                                <button type="button" 
+                                        class="btn btn-outline-secondary" 
+                                        id="btnDetailPlus" 
+                                        onclick="stepDetailQty(1, {{ $maxRentableDetail }})" 
+                                        {{ ! $canRent ? 'disabled' : '' }}>+</button>
                             </div>
-                            @error('jumlah')
-                                <small class="text-danger d-block mt-1">{{ $message }}</small>
-                            @enderror
+                            <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                                Tentukan jumlah unit yang ingin disewa (minimal 1 unit untuk menambah ke keranjang).
+                            </small>
                         </div>
 
-                        <!-- Periode Sewa -->
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label font-weight-bold small">Mulai Sewa <span class="text-danger">*</span></label>
-                                <input type="date" name="tanggal_sewa" id="tanggalSewa" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required onchange="onTanggalSewaChange()">
-                                @error('tanggal_sewa')
-                                    <small class="text-danger d-block mt-1">{{ $message }}</small>
-                                @enderror
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label font-weight-bold small">Kembali <span class="text-danger">*</span></label>
-                                <input type="date" name="tanggal_kembali" id="tanggalKembali" class="form-control form-control-sm" value="{{ date('Y-m-d', strtotime('+1 day')) }}" min="{{ date('Y-m-d', strtotime('+1 day')) }}" required onchange="hitungRingkasan()">
-                                @error('tanggal_kembali')
-                                    <small class="text-danger d-block mt-1">{{ $message }}</small>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <!-- Pilihan Metode Pembayaran -->
-                        <div class="mb-3">
-                            <label class="form-label font-weight-bold small">Pilihan Metode Pembayaran <span class="text-danger">*</span></label>
-                            <select name="metode_pembayaran" class="form-select form-select-sm" required>
-                                <option value="QRIS" selected>QRIS (Kasir Basecamp)</option>
-                                <option value="Transfer Bank">Transfer Bank Resmi</option>
-                                <option value="Cash">Tunai / Cash di Basecamp</option>
-                            </select>
-                            @error('metode_pembayaran')
-                                <small class="text-danger d-block mt-1">{{ $message }}</small>
-                            @enderror
-                        </div>
-
-                        <!-- Ringkasan Biaya Transaksi -->
-                        <div class="p-3 bg-light rounded-3 mb-3 border">
-                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                <span>Durasi Sewa:</span>
-                                <span id="labelDurasi" class="fw-bold text-dark">1 Hari</span>
-                            </div>
-                            <div class="d-flex justify-content-between small text-muted mb-2">
-                                <span>Kalkulasi:</span>
-                                <span id="labelKalkulasi" class="font-monospace">1 &times; {{ $alat->formatted_tarif }} &times; 1 hari</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <strong class="small">Estimasi Tagihan:</strong>
-                                <strong class="text-success" style="font-size:1.2rem;" id="labelTotal">
-                                    {{ $alat->formatted_tarif }}
-                                </strong>
-                            </div>
-                        </div>
-
-                        <!-- Tombol Submit Lanjutkan Pesanan -->
-                        <button type="submit" class="btn btn-ac-primary w-100 py-2.5 font-weight-bold d-flex align-items-center justify-content-center gap-2">
-                            <span>Lanjutkan Pesanan</span>
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        <button type="submit" 
+                                class="btn btn-ac-primary w-100 py-2.5 font-weight-bold d-flex align-items-center justify-content-center gap-2" 
+                                id="btnDetailSubmit" 
+                                disabled>
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
                             </svg>
+                            <span id="btnDetailSubmitText">+ Tambah ke Keranjang</span>
                         </button>
-                        <small class="text-muted d-block text-center mt-2" style="font-size:0.75rem;">
-                            Pesanan akan diperiksa ketersediaan stoknya oleh Admin sebelum instruksi pembayaran diterbitkan.
-                        </small>
                     </form>
+                </div>
 
-                    <script>
-                        const tarifPerHari = {{ (float) $alat->tarif_sewa }};
-                        const maxStok = {{ (int) $alat->stok }};
-
-                        function ubahJumlah(delta) {
-                            const input = document.getElementById('inputJumlah');
-                            let val = parseInt(input.value) || 1;
-                            val = Math.max(1, Math.min(maxStok, val + delta));
-                            input.value = val;
-                            hitungRingkasan();
-                        }
-
-                        function onTanggalSewaChange() {
-                            const sewaInput = document.getElementById('tanggalSewa');
-                            const kembaliInput = document.getElementById('tanggalKembali');
-                            if (sewaInput.value) {
-                                const d = new Date(sewaInput.value);
-                                d.setDate(d.getDate() + 1);
-                                const minKembali = d.toISOString().split('T')[0];
-                                kembaliInput.min = minKembali;
-                                if (!kembaliInput.value || kembaliInput.value <= sewaInput.value) {
-                                    kembaliInput.value = minKembali;
-                                }
-                            }
-                            hitungRingkasan();
-                        }
-
-                        function hitungRingkasan() {
-                            const jumlah = parseInt(document.getElementById('inputJumlah').value) || 1;
-                            const sewaStr = document.getElementById('tanggalSewa').value;
-                            const kembaliStr = document.getElementById('tanggalKembali').value;
-
-                            let durasi = 1;
-                            if (sewaStr && kembaliStr) {
-                                const d1 = new Date(sewaStr);
-                                const d2 = new Date(kembaliStr);
-                                const diffTime = d2 - d1;
-                                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                                durasi = Math.max(1, diffDays);
-                            }
-
-                            const total = tarifPerHari * jumlah * durasi;
-
-                            document.getElementById('labelDurasi').textContent = durasi + ' Hari';
-                            document.getElementById('labelKalkulasi').textContent = jumlah + ' × Rp ' + tarifPerHari.toLocaleString('id-ID') + ' × ' + durasi + ' hari';
-                            document.getElementById('labelTotal').textContent = 'Rp ' + total.toLocaleString('id-ID');
-                        }
-
-                        function stepCartQty(delta, max) {
-                            const input = document.getElementById('inputCartJumlah');
-                            if (!input) return;
-                            let val = parseInt(input.value) || 1;
-                            val = Math.max(1, Math.min(max, val + delta));
-                            input.value = val;
-                        }
-                    </script>
-                @else
-                    <div class="alert alert-warning py-3 px-3 mb-0 small" style="border-radius:8px;">
-                        <strong>Perhatian:</strong> Peralatan ini sedang tidak tersedia untuk disewa (stok habis atau sedang dalam pemeliharaan).
-                    </div>
-                @endif
+                <!-- Navigasi Tambahan ke Keranjang Belanja -->
+                <div class="pt-4 border-top mt-4 text-center">
+                    <a href="{{ route('pengguna.keranjang.index') }}" class="btn btn-link text-decoration-none small text-success fw-bold d-inline-flex align-items-center gap-1">
+                        <span>Lanjutkan Pesanan di Keranjang Belanja</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Floating Toast Container -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1090">
+    <div id="detailToast" class="toast align-items-center text-bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body d-flex align-items-center gap-2">
+                <span class="fs-5">🛒</span>
+                <span id="detailToastMessage">Alat berhasil ditambahkan ke keranjang!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function stepDetailQty(delta, max) {
+        const input = document.getElementById('inputDetailJumlah');
+        if (!input || input.disabled) return;
+        let val = parseInt(input.value) || 0;
+        val = Math.max(0, Math.min(max, val + delta));
+        input.value = val;
+        updateDetailControlState(val, max);
+    }
+
+    function validateDetailQtyInput(max) {
+        const input = document.getElementById('inputDetailJumlah');
+        if (!input || input.disabled) return;
+        let raw = input.value.trim();
+        if (raw === '') {
+            updateDetailControlState(0, max);
+            return;
+        }
+        let val = parseInt(raw);
+        if (isNaN(val) || val < 0) {
+            val = 0;
+        } else if (val > max) {
+            val = max;
+        }
+        input.value = val;
+        updateDetailControlState(val, max);
+    }
+
+    function updateDetailControlState(qty, max) {
+        const input = document.getElementById('inputDetailJumlah');
+        const btnMinus = document.getElementById('btnDetailMinus');
+        const btnPlus = document.getElementById('btnDetailPlus');
+        const btnSubmit = document.getElementById('btnDetailSubmit');
+
+        const isInputDisabled = input ? input.disabled : false;
+
+        if (btnMinus) {
+            btnMinus.disabled = isInputDisabled || (qty <= 0);
+        }
+        if (btnPlus) {
+            btnPlus.disabled = isInputDisabled || (qty >= max || max <= 0);
+        }
+        if (btnSubmit) {
+            btnSubmit.disabled = isInputDisabled || (qty <= 0 || qty > max || max <= 0);
+        }
+    }
+
+    // Interaktif Tambah ke Keranjang via AJAX
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('formAddToCartDetail');
+        const toastEl = document.getElementById('detailToast');
+        const toast = toastEl ? new bootstrap.Toast(toastEl, { delay: 3000 }) : null;
+
+        const maxStok = {{ (int) $alat->stok }};
+        const initialInput = document.getElementById('inputDetailJumlah');
+        const initialQty = parseInt(initialInput ? initialInput.value : 0) || 0;
+        updateDetailControlState(initialQty, maxStok);
+
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const qtyInput = document.getElementById('inputDetailJumlah');
+            const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+
+            if (qty <= 0) {
+                const pesanPeringatan = 'Silakan tentukan jumlah unit sewa terlebih dahulu (minimal 1 unit).';
+                if (toast && toastEl) {
+                    toastEl.className = 'toast align-items-center text-bg-warning border-0 shadow-lg';
+                    const iconSpan = toastEl.querySelector('.toast-body span.fs-5');
+                    if (iconSpan) iconSpan.textContent = '⚠️';
+                    document.getElementById('detailToastMessage').textContent = pesanPeringatan;
+                    toast.show();
+                } else {
+                    alert(pesanPeringatan);
+                }
+                if (qtyInput) {
+                    qtyInput.focus();
+                }
+                return;
+            }
+
+            if (qty > maxStok) {
+                alert('Jumlah unit melebihi sisa stok yang tersedia (' + maxStok + ' unit).');
+                if (qtyInput) {
+                    qtyInput.value = maxStok;
+                    updateDetailControlState(maxStok, maxStok);
+                }
+                return;
+            }
+
+            const btn = document.getElementById('btnDetailSubmit');
+            const btnText = document.getElementById('btnDetailSubmitText');
+            const origText = btnText ? btnText.textContent : '+ Tambah ke Keranjang';
+            btn.disabled = true;
+            if (btnText) btnText.textContent = 'Menyimpan...';
+
+            const formData = new FormData(form);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
+            .then(result => {
+                btn.disabled = false;
+                if (btnText) btnText.textContent = origText;
+
+                if (result.ok) {
+                    // Perbarui badge keranjang navbar
+                    const navBadge = document.getElementById('cartBadgeCount');
+                    if (navBadge) {
+                        navBadge.textContent = result.data.cart_count;
+                        navBadge.style.display = result.data.cart_count > 0 ? '' : 'none';
+                    }
+
+                    // Umpan balik visual pada tombol
+                    btn.classList.remove('btn-ac-primary');
+                    btn.classList.add('btn-success');
+                    if (btnText) btnText.textContent = '✓ Berhasil Ditambahkan';
+                    setTimeout(() => {
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-ac-primary');
+                        if (btnText) btnText.textContent = origText;
+                    }, 1400);
+
+                    // Reset input kembali ke 0
+                    if (qtyInput) {
+                        qtyInput.value = 0;
+                        updateDetailControlState(0, maxStok);
+                    }
+
+                    if (toast && toastEl) {
+                        toastEl.className = 'toast align-items-center text-bg-success border-0 shadow-lg';
+                        const iconSpan = toastEl.querySelector('.toast-body span.fs-5');
+                        if (iconSpan) iconSpan.textContent = '🛒';
+                        document.getElementById('detailToastMessage').textContent = result.data.message;
+                        toast.show();
+                    }
+                } else {
+                    const errMsg = (result.data && (result.data.message || (result.data.errors && Object.values(result.data.errors).flat()[0])))
+                        || 'Gagal menambahkan alat ke keranjang.';
+                    alert(errMsg);
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                if (btnText) btnText.textContent = origText;
+                form.submit();
+            });
+        });
+    });
+</script>
 @endsection

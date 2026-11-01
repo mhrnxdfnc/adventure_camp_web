@@ -1,7 +1,7 @@
 <?php
 
 session_start();
-require_once __DIR__ . '/koneksi.php';
+require_once __DIR__.'/koneksi.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -12,7 +12,7 @@ function customerResponse($status, $message, $data = [], $httpCode = 200)
     echo json_encode([
         'status' => $status,
         'message' => $message,
-        'data' => $data
+        'data' => $data,
     ], JSON_UNESCAPED_UNICODE);
 
     exit;
@@ -51,12 +51,12 @@ try {
     // 2. AMBIL DATA PELANGGAN
     // ========================================
 
-    $st = $conn->prepare("
+    $st = $conn->prepare('
         SELECT id_pelanggan, nama_pelanggan
         FROM pelanggan
         WHERE id_pelanggan = ?
         LIMIT 1
-    ");
+    ');
 
     $st->bind_param('i', $idPelanggan);
     $st->execute();
@@ -64,7 +64,7 @@ try {
     $customer = $st->get_result()->fetch_assoc();
     $st->close();
 
-    if (!$customer) {
+    if (! $customer) {
         throw new Exception('Data pelanggan tidak ditemukan.');
     }
 
@@ -223,7 +223,7 @@ try {
         );
 
         $o['kode_bayar'] =
-            'AC-' . $o['no_transaksi'];
+            'AC-'.$o['no_transaksi'];
 
         // Tombol bayar tetap tersedia selama masih ada
         // sisa tagihan. Pembayaran sebelumnya yang masih
@@ -238,7 +238,7 @@ try {
         // 5. AMBIL DETAIL ALAT
         // ========================================
 
-        $sd = $conn->prepare("
+        $sd = $conn->prepare('
             SELECT
                 d.kode_alat,
                 a.nama_alat,
@@ -248,7 +248,7 @@ try {
             JOIN alat a
                 ON a.kode_alat = d.kode_alat
             WHERE d.no_transaksi = ?
-        ");
+        ');
 
         $sd->bind_param('s', $o['no_transaksi']);
         $sd->execute();
@@ -278,19 +278,19 @@ try {
         'status' => 'success',
         'data' => [
             'nama' => $customer['nama_pelanggan'],
-            'pesanan' => $orders
-        ]
+            'pesanan' => $orders,
+        ],
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
 
-    error_log('api_customer.php: ' . $e->getMessage());
+    error_log('api_customer.php: '.$e->getMessage());
 
     http_response_code(500);
 
     echo json_encode([
         'status' => 'error',
-        'message' => 'Gagal mengambil data pelanggan. Periksa log PHP jika masalah berlanjut.'
+        'message' => 'Gagal mengambil data pelanggan. Periksa log PHP jika masalah berlanjut.',
     ], JSON_UNESCAPED_UNICODE);
 }
 

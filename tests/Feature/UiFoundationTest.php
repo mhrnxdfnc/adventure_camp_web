@@ -8,12 +8,12 @@ use Tests\TestCase;
 class UiFoundationTest extends TestCase
 {
     /**
-     * Uji redirect root ke showcase antarmuka
+     * Uji redirect root ke halaman login bagi pengunjung umum
      */
     public function test_root_redirects_to_ui_showcase(): void
     {
         $response = $this->get('/');
-        $response->assertRedirect('/ui-showcase');
+        $response->assertRedirect('/login');
     }
 
     /**

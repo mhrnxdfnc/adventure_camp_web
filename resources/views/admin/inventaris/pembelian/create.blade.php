@@ -38,7 +38,7 @@
     </div>
 @endif
 
-<form action="{{ route('admin.inventaris.pembelian.store') }}" method="POST" id="form-pembelian-supplier">
+<form action="{{ route('admin.inventaris.pembelian.store') }}" method="POST" id="form-pembelian-supplier" onsubmit="const btn = document.getElementById('btn-submit-pembelian'); if (this.submitted) return false; this.submitted = true; btn.disabled = true; btn.innerHTML = '<span>⏳ Menyimpan Pembelian...</span>'; return true;">
     @csrf
 
     <div class="row g-4">
@@ -146,31 +146,40 @@
                             </tr>
                         </thead>
                         <tbody id="tbody-items">
-                            <!-- Baris Item 0 Default -->
-                            <tr class="item-row">
-                                <td>
-                                    <select name="items[0][kode_alat]" class="form-select form-select-sm select-alat" required>
-                                        <option value="">-- Pilih Alat --</option>
-                                        @foreach($alatList as $alat)
-                                            <option value="{{ $alat->kode_alat }}" data-nama="{{ $alat->nama_alat }}">
-                                                {{ $alat->kode_alat }} &mdash; {{ $alat->nama_alat }} (Stok saat ini: {{ $alat->stok }})
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td>
-                                    <input type="number" name="items[0][kuantitas]" class="form-control form-control-sm text-center input-qty" value="1" min="1" required>
-                                </td>
-                                <td>
-                                    <input type="number" name="items[0][harga_beli_satuan]" class="form-control form-control-sm text-end input-harga" value="0" min="0" step="500" required>
-                                </td>
-                                <td class="text-end font-monospace fw-bold text-dark cell-subtotal">
-                                    Rp 0
-                                </td>
-                                <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-hapus-baris" title="Hapus baris" disabled>&times;</button>
-                                </td>
-                            </tr>
+                            @php
+                                $oldItems = old('items');
+                                if (!is_array($oldItems) || empty($oldItems)) {
+                                    $oldItems = [
+                                        ['kode_alat' => $selectedKodeAlat ?? '', 'kuantitas' => 1, 'harga_beli_satuan' => 0]
+                                    ];
+                                }
+                            @endphp
+                            @foreach($oldItems as $idx => $it)
+                                <tr class="item-row">
+                                    <td>
+                                        <select name="items[{{ $idx }}][kode_alat]" class="form-select form-select-sm select-alat" required>
+                                            <option value="">-- Pilih Alat --</option>
+                                            @foreach($alatList as $alat)
+                                                <option value="{{ $alat->kode_alat }}" {{ ($it['kode_alat'] ?? '') === $alat->kode_alat ? 'selected' : '' }} data-nama="{{ $alat->nama_alat }}">
+                                                    {{ $alat->kode_alat }} &mdash; {{ $alat->nama_alat }} (Stok saat ini: {{ $alat->stok }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[{{ $idx }}][kuantitas]" class="form-control form-control-sm text-center input-qty" value="{{ $it['kuantitas'] ?? 1 }}" min="1" required>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[{{ $idx }}][harga_beli_satuan]" class="form-control form-control-sm text-end input-harga" value="{{ $it['harga_beli_satuan'] ?? 0 }}" min="0" step="500" required>
+                                    </td>
+                                    <td class="text-end font-monospace fw-bold text-dark cell-subtotal">
+                                        Rp {{ number_format(((float)($it['kuantitas'] ?? 1)) * ((float)($it['harga_beli_satuan'] ?? 0)), 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-hapus-baris" title="Hapus baris" {{ count($oldItems) <= 1 ? 'disabled' : '' }}>&times;</button>
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
@@ -203,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tbody = document.getElementById('tbody-items');
     const btnTambah = document.getElementById('btn-tambah-baris');
     const displayTotal = document.getElementById('total-pembelian-display');
-    let rowIndex = 1;
+    let rowIndex = {{ max(1, count($oldItems)) }};
 
     function hitungTotal() {
         let total = 0;

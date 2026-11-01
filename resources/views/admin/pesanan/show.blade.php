@@ -26,6 +26,10 @@
         </h2>
     </div>
     <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('admin.pesanan.nota', $penyewaan->no_transaksi) }}" target="_blank" class="btn btn-outline-dark btn-sm d-flex align-items-center gap-1 shadow-sm" id="btn-cetak-nota-admin">
+            <span>🖨️</span>
+            <span>Cetak Nota Resmi</span>
+        </a>
         <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
             &larr; Kembali ke Dashboard
         </a>
@@ -257,6 +261,11 @@
                 <span class="badge bg-secondary-subtle text-dark border">
                     Pesanan telah diproses dengan status: {{ $penyewaan->status_penyewaan }}
                 </span>
+                @if($penyewaan->isSiapDiambil())
+                    <span class="badge bg-success-subtle text-success border border-success ms-1">
+                        ✓ Siap Diambil / Diserahkan
+                    </span>
+                @endif
             @endif
         </div>
 
@@ -274,6 +283,13 @@
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalTolakPesananShow">
                     ✕ Tolak Pesanan
                 </button>
+            </div>
+        @elseif($penyewaan->isSiapDiambil())
+            <div>
+                <a href="{{ route('admin.operasional.pengambilan', ['search' => $penyewaan->no_transaksi]) }}" class="btn btn-success d-inline-flex align-items-center gap-2 py-2 px-3 fw-bold">
+                    <span>📦</span>
+                    <span>Lanjut ke Penyerahan Alat &rarr;</span>
+                </a>
             </div>
 
             <!-- Modal Tolak Pesanan -->

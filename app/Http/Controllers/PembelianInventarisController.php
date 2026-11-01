@@ -57,7 +57,7 @@ class PembelianInventarisController extends Controller
     /**
      * Formulir pencatatan pengadaan stok baru dari supplier
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $todayStr = date('Ymd');
         $countToday = PembelianInventaris::whereDate('created_at', today())->count() + 1;
@@ -65,11 +65,13 @@ class PembelianInventarisController extends Controller
 
         $supplierList = Supplier::orderBy('nama_supplier')->get();
         $alatList = Alat::orderBy('kategori')->orderBy('nama_alat')->get();
+        $selectedKodeAlat = trim((string) $request->query('kode_alat', ''));
 
         return view('admin.inventaris.pembelian.create', [
             'suggestedNo' => $suggestedNo,
             'supplierList' => $supplierList,
             'alatList' => $alatList,
+            'selectedKodeAlat' => $selectedKodeAlat,
         ]);
     }
 

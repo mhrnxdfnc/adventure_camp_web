@@ -62,7 +62,7 @@
 <!-- Card Filter & Pencarian Log -->
 <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
     <div class="card-body p-3">
-        <form action="{{ route('admin.logs.index') }}" method="GET" class="row g-2 align-items-end">
+        <form action="{{ request()->routeIs('pemilik.*') ? route('pemilik.logs.index') : route('admin.logs.index') }}" method="GET" class="row g-2 align-items-end">
             <!-- Kata Kunci -->
             <div class="col-12 col-md-4">
                 <label class="form-label small font-weight-bold text-muted mb-1">Cari Aktivitas / Informasi</label>
@@ -103,7 +103,7 @@
                     Filter
                 </button>
                 @if(!empty($filters['search']) || !empty($filters['modul']) || !empty($filters['tanggal_mulai']) || !empty($filters['tanggal_selesai']))
-                    <a href="{{ route('admin.logs.index') }}" class="btn btn-outline-secondary" title="Reset Filter">
+                    <a href="{{ request()->routeIs('pemilik.*') ? route('pemilik.logs.index') : route('admin.logs.index') }}" class="btn btn-outline-secondary" title="Reset Filter">
                         ✕
                     </a>
                 @endif

@@ -1,16 +1,16 @@
 <?php
 
-include "koneksi.php";
+include 'koneksi.php';
 
-$jenis = $_GET["jenis"] ?? "";
+$jenis = $_GET['jenis'] ?? '';
 
-$dari = $_GET["dari"] ?? "";
-$sampai = $_GET["sampai"] ?? "";
-$cari = $_GET["cari"] ?? "";
+$dari = $_GET['dari'] ?? '';
+$sampai = $_GET['sampai'] ?? '';
+$cari = $_GET['cari'] ?? '';
 
-if ($jenis === "penyewaan") {
+if ($jenis === 'penyewaan') {
 
-    $sql = "
+    $sql = '
         SELECT
             p.no_transaksi,
             p.tanggal_sewa,
@@ -46,40 +46,40 @@ if ($jenis === "penyewaan") {
             ON p.no_transaksi = d.no_transaksi
 
         WHERE 1=1
-    ";
+    ';
 
     $params = [];
-    $types = "";
+    $types = '';
 
-    if ($dari !== "") {
-        $sql .= " AND p.tanggal_sewa >= ?";
+    if ($dari !== '') {
+        $sql .= ' AND p.tanggal_sewa >= ?';
         $params[] = $dari;
-        $types .= "s";
+        $types .= 's';
     }
 
-    if ($sampai !== "") {
-        $sql .= " AND p.tanggal_sewa <= ?";
+    if ($sampai !== '') {
+        $sql .= ' AND p.tanggal_sewa <= ?';
         $params[] = $sampai;
-        $types .= "s";
+        $types .= 's';
     }
 
-    if ($cari !== "") {
-        $sql .= "
+    if ($cari !== '') {
+        $sql .= '
             AND (
                 p.no_transaksi LIKE ?
                 OR pl.nama_pelanggan LIKE ?
             )
-        ";
+        ';
 
         $keyword = "%$cari%";
 
         $params[] = $keyword;
         $params[] = $keyword;
 
-        $types .= "ss";
+        $types .= 'ss';
     }
 
-    $sql .= "
+    $sql .= '
         GROUP BY
             p.no_transaksi,
             p.tanggal_sewa,
@@ -89,11 +89,11 @@ if ($jenis === "penyewaan") {
             p.status_penyewaan
 
         ORDER BY p.tanggal_sewa DESC
-    ";
+    ';
 
     $stmt = $conn->prepare($sql);
 
-    if (!empty($params)) {
+    if (! empty($params)) {
         $stmt->bind_param(
             $types,
             ...$params
@@ -111,17 +111,16 @@ if ($jenis === "penyewaan") {
     }
 
     echo json_encode([
-        "status" => "success",
-        "data" => $data
+        'status' => 'success',
+        'data' => $data,
     ]);
 
     exit;
 }
 
+if ($jenis === 'pendapatan') {
 
-if ($jenis === "pendapatan") {
-
-    $sql = "
+    $sql = '
         SELECT
             b.no_pembayaran,
             b.no_transaksi,
@@ -141,47 +140,47 @@ if ($jenis === "pendapatan") {
             ON p.id_pelanggan = pl.id_pelanggan
 
         WHERE 1=1
-    ";
+    ';
 
     $params = [];
-    $types = "";
+    $types = '';
 
-    if ($dari !== "") {
-        $sql .= " AND DATE(b.tanggal_pembayaran) >= ?";
+    if ($dari !== '') {
+        $sql .= ' AND DATE(b.tanggal_pembayaran) >= ?';
         $params[] = $dari;
-        $types .= "s";
+        $types .= 's';
     }
 
-    if ($sampai !== "") {
-        $sql .= " AND DATE(b.tanggal_pembayaran) <= ?";
+    if ($sampai !== '') {
+        $sql .= ' AND DATE(b.tanggal_pembayaran) <= ?';
         $params[] = $sampai;
-        $types .= "s";
+        $types .= 's';
     }
 
-    if ($cari !== "") {
+    if ($cari !== '') {
 
-        $sql .= "
+        $sql .= '
             AND (
                 b.no_transaksi LIKE ?
                 OR pl.nama_pelanggan LIKE ?
             )
-        ";
+        ';
 
         $keyword = "%$cari%";
 
         $params[] = $keyword;
         $params[] = $keyword;
 
-        $types .= "ss";
+        $types .= 'ss';
     }
 
-    $sql .= "
+    $sql .= '
         ORDER BY b.tanggal_pembayaran DESC
-    ";
+    ';
 
     $stmt = $conn->prepare($sql);
 
-    if (!empty($params)) {
+    if (! empty($params)) {
         $stmt->bind_param(
             $types,
             ...$params
@@ -199,16 +198,15 @@ if ($jenis === "pendapatan") {
     }
 
     echo json_encode([
-        "status" => "success",
-        "data" => $data
+        'status' => 'success',
+        'data' => $data,
     ]);
 
     exit;
 }
 
-
 // Jika jenis kosong atau role dikirim (seperti dari Flutter LaporanScreen)
-$resPenyewaan = $conn->query("
+$resPenyewaan = $conn->query('
     SELECT
         p.no_transaksi,
         p.tanggal_sewa,
@@ -236,13 +234,15 @@ $resPenyewaan = $conn->query("
     LEFT JOIN detail_penyewaan d ON p.no_transaksi = d.no_transaksi
     GROUP BY p.no_transaksi, p.tanggal_sewa, p.tanggal_kembali, pl.nama_pelanggan, u.nama_user, p.status_penyewaan
     ORDER BY p.tanggal_sewa DESC
-");
+');
 $penyewaan = [];
 if ($resPenyewaan) {
-    while ($r = $resPenyewaan->fetch_assoc()) { $penyewaan[] = $r; }
+    while ($r = $resPenyewaan->fetch_assoc()) {
+        $penyewaan[] = $r;
+    }
 }
 
-$resPembayaran = $conn->query("
+$resPembayaran = $conn->query('
     SELECT
         b.no_pembayaran,
         b.no_transaksi,
@@ -256,10 +256,12 @@ $resPembayaran = $conn->query("
     JOIN penyewaan p ON b.no_transaksi = p.no_transaksi
     JOIN pelanggan pl ON p.id_pelanggan = pl.id_pelanggan
     ORDER BY b.tanggal_pembayaran DESC
-");
+');
 $pembayaran = [];
 if ($resPembayaran) {
-    while ($r = $resPembayaran->fetch_assoc()) { $pembayaran[] = $r; }
+    while ($r = $resPembayaran->fetch_assoc()) {
+        $pembayaran[] = $r;
+    }
 }
 
 $resTotal = $conn->query("
@@ -269,19 +271,19 @@ $resTotal = $conn->query("
 ");
 $totalPendapatan = 0;
 if ($resTotal) {
-    $totalPendapatan = (float)$resTotal->fetch_assoc()["total"];
+    $totalPendapatan = (float) $resTotal->fetch_assoc()['total'];
 }
 
 echo json_encode([
-    "status" => "success",
-    "penyewaan" => $penyewaan,
-    "pembayaran" => $pembayaran,
-    "total_pendapatan" => $totalPendapatan,
-    "data" => [
-        "penyewaan" => $penyewaan,
-        "pembayaran" => $pembayaran,
-        "total_pendapatan" => $totalPendapatan
-    ]
+    'status' => 'success',
+    'penyewaan' => $penyewaan,
+    'pembayaran' => $pembayaran,
+    'total_pendapatan' => $totalPendapatan,
+    'data' => [
+        'penyewaan' => $penyewaan,
+        'pembayaran' => $pembayaran,
+        'total_pendapatan' => $totalPendapatan,
+    ],
 ]);
 $conn->close();
 exit;

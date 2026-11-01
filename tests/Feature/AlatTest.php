@@ -390,4 +390,260 @@ class AlatTest extends TestCase
         $reloadRes->assertStatus(200);
         $this->assertEquals(2, KeranjangController::count($pengguna->id_user));
     }
+
+    /**
+     * Memastikan kartu katalog menampilkan seluruh elemen yang disyaratkan:
+     * nama alat, kode, kategori, kondisi, stok tersedia, tarif harian dengan label "/ unit / hari",
+     * stepper kontrol kuantitas awal 0, tombol keranjang awal disabled, dan tautan rincian detail.
+     * Serta memastikan TIDAK ADA kontrol durasi atau tanggal pada kartu katalog.
+     */
+    public function test_katalog_cards_display_all_required_elements_and_no_duration_controls(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($pengguna->id_user);
+
+        $response = $this->actingAs($pengguna)->get('/pengguna/katalog');
+        $response->assertStatus(200);
+
+        // Ambil alat yang aktif di katalog
+        $alatList = Alat::where('kondisi', 'Baik')->where('stok', '>', 0)->get();
+        $this->assertGreaterThan(0, $alatList->count());
+
+        foreach ($alatList as $alat) {
+            // 1. Nama alat, kode, kategori, kondisi
+            $response->assertSee($alat->nama_alat);
+            $response->assertSee($alat->kode_alat);
+            $response->assertSee($alat->kategori);
+            $response->assertSee($alat->kondisi);
+
+            // 2. Stok yang tersedia
+            $response->assertSee('Stok: '.$alat->stok.' unit');
+
+            // 3. Tarif harian dengan format "/ unit / hari"
+            $response->assertSee('/ unit / hari');
+            $response->assertSee('Rp '.number_format($alat->tarif_sewa, 0, ',', '.'));
+
+            // 4. Kontrol jumlah unit awal 0 dan tombol minus awal disabled
+            $response->assertSee('id="qty_'.$alat->kode_alat.'"', false);
+            $response->assertSee('id="btn_minus_'.$alat->kode_alat.'"', false);
+            $response->assertSee('id="btn_plus_'.$alat->kode_alat.'"', false);
+            $response->assertSee('id="btn_cart_'.$alat->kode_alat.'"', false);
+
+            // 5. Tautan rincian detail
+            $response->assertSee(route('pengguna.katalog.show', $alat->kode_alat));
+        }
+
+        // 6. Memastikan tidak ada kontrol durasi sewa atau pilihan tanggal pada kartu katalog
+        $response->assertDontSee('type="date"', false);
+        $response->assertDontSee('name="tgl_sewa"', false);
+        $response->assertDontSee('name="tgl_kembali"', false);
+        $response->assertDontSee('name="durasi"', false);
+    }
+
+    /**
+     * Memastikan alat yang tidak layak sewa atau stok habis tidak dapat ditambahkan ke keranjang
+     */
+    public function test_katalog_handles_unrentable_and_out_of_stock_conditions(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($pengguna->id_user);
+
+        // Alat kondisi rusak
+        $alatRusak = Alat::where('kondisi', '!=', 'Baik')->first();
+        if ($alatRusak) {
+            $res = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+                'kode_alat' => $alatRusak->kode_alat,
+                'jumlah' => 1,
+            ]);
+            $res->assertSessionHas('error');
+            $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+        }
+
+        // Alat dengan stok 0
+        $alatHabis = Alat::where('stok', '<=', 0)->first();
+        if (! $alatHabis) {
+            $alatHabis = Alat::create([
+                'kode_alat' => 'ALT998',
+                'nama_alat' => 'Tenda Uji Stok Kosong',
+                'kategori' => 'Tenda',
+                'stok' => 0,
+                'kondisi' => 'Baik',
+                'tarif_sewa' => 30000,
+            ]);
+        }
+        $resHabis = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alatHabis->kode_alat,
+            'jumlah' => 1,
+        ]);
+        $resHabis->assertSessionHas('error');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        if ($alatHabis->kode_alat === 'ALT998') {
+            $alatHabis->delete();
+        }
+    }
+
+    /**
+     * Memastikan penambahan beberapa jenis alat berbeda ke keranjang memperbarui kuantitas
+     * tanpa membuat baris duplikat, dan memvalidasi batas stok maksimal.
+     */
+    public function test_katalog_multi_item_addition_and_stock_limits(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($pengguna->id_user);
+
+        $alat1 = Alat::where('kode_alat', 'ALT001')->first();
+        $alat1->stok = 10;
+        $alat1->save();
+
+        $alat2 = Alat::where('kode_alat', 'ALT002')->first();
+        $alat2->stok = 10;
+        $alat2->save();
+
+        // 1. Tambah alat 1 (2 unit)
+        $res1 = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat1->kode_alat,
+            'jumlah' => 2,
+        ]);
+        $res1->assertSessionHas('success');
+
+        // 2. Tambah alat 2 (1 unit)
+        $res2 = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat2->kode_alat,
+            'jumlah' => 1,
+        ]);
+        $res2->assertSessionHas('success');
+
+        // 3. Tambah lagi alat 1 (1 unit) -> harus menambah jumlah alat 1 tanpa membuat baris duplikat
+        $res3 = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat1->kode_alat,
+            'jumlah' => 1,
+        ]);
+        $res3->assertSessionHas('success');
+
+        $this->assertEquals(2, KeranjangController::countDistinct($pengguna->id_user));
+        $this->assertEquals(4, KeranjangController::count($pengguna->id_user));
+
+        $cart = KeranjangController::getCart($pengguna->id_user);
+        $this->assertEquals(3, $cart[$alat1->kode_alat]['jumlah']);
+        $this->assertEquals(1, $cart[$alat2->kode_alat]['jumlah']);
+
+        // 4. Menambah melebihi stok yang tersisa harus ditolak
+        $sisaStokAlat2 = $alat2->stok - 1;
+        $resExceed = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat2->kode_alat,
+            'jumlah' => $sisaStokAlat2 + 10,
+        ]);
+        $resExceed->assertSessionHas('error');
+
+        // Jumlah keranjang tidak boleh bertambah
+        $this->assertEquals(4, KeranjangController::count($pengguna->id_user));
+    }
+
+    /**
+     * Memastikan halaman detail alat menampilkan informasi produk aktual:
+     * nama alat, kode alat, kategori, ilustrasi visual, kondisi, stok tersedia, tarif harian "/ unit / hari",
+     * tombol kembali ke katalog, tombol menuju keranjang, dan kontrol kuantitas awal 0 dengan tombol disabled.
+     * Serta memastikan TIDAK ADA pesan teknis rumus, pemilih tanggal, atau durasi sewa.
+     */
+    public function test_equipment_detail_displays_required_product_info_and_excludes_technical_duration_clutter(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        $alat = Alat::where('kode_alat', 'ALT001')->first();
+
+        // 1. Navigasi dari katalog: link detail ada di katalog
+        $katalogRes = $this->actingAs($pengguna)->get(route('pengguna.katalog.index'));
+        $katalogRes->assertStatus(200);
+        $katalogRes->assertSee(route('pengguna.katalog.show', $alat->kode_alat));
+
+        // 2. Akses halaman detail alat
+        $detailRes = $this->actingAs($pengguna)->get(route('pengguna.katalog.show', $alat->kode_alat));
+        $detailRes->assertStatus(200);
+
+        // Memastikan informasi produk aktual tampil
+        $detailRes->assertSee($alat->nama_alat);
+        $detailRes->assertSee($alat->kode_alat);
+        $detailRes->assertSee($alat->kategori);
+        $detailRes->assertSee($alat->kondisi);
+        $detailRes->assertSee($alat->stok.' Unit');
+        $detailRes->assertSee('Rp '.number_format($alat->tarif_sewa, 0, ',', '.'));
+        $detailRes->assertSee('/ unit / hari');
+
+        // Memastikan tombol kembali ke katalog dan tombol ke keranjang tersedia
+        $detailRes->assertSee('Kembali ke Katalog');
+        $detailRes->assertSee(route('pengguna.katalog.index'));
+        $detailRes->assertSee(route('pengguna.keranjang.index'));
+
+        // Memastikan kontrol jumlah awal 0 dan tombol minus & submit awal disabled
+        $detailRes->assertSee('id="inputDetailJumlah"', false);
+        $detailRes->assertSee('value="0"', false);
+        $detailRes->assertSee('id="btnDetailMinus"', false);
+        $detailRes->assertSee('id="btnDetailSubmit"', false);
+
+        // Memastikan TIDAK ADA pemilihan tanggal sewa, durasi sewa, atau kalkulasi teknis internal
+        $detailRes->assertDontSee('type="date"', false);
+        $detailRes->assertDontSee('name="tanggal_sewa"', false);
+        $detailRes->assertDontSee('name="tanggal_kembali"', false);
+        $detailRes->assertDontSee('name="durasi"', false);
+        $detailRes->assertDontSee('belum dikalikan durasi sewa');
+        $detailRes->assertDontSee('labelKalkulasi');
+        $detailRes->assertDontSee('labelDurasi');
+        $detailRes->assertDontSee('Estimasi Tagihan');
+    }
+
+    /**
+     * Memastikan penambahan barang dari halaman detail alat memvalidasi kuantitas:
+     * tidak boleh 0, tidak boleh negatif, tidak melebihi stok, dan konsisten dengan keranjang belanja.
+     */
+    public function test_equipment_detail_cart_controls_and_quantity_validation(): void
+    {
+        $pengguna = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($pengguna->id_user);
+
+        $alat = Alat::where('kode_alat', 'ALT001')->first();
+        $alat->stok = 10;
+        $alat->save();
+
+        // 1. Submit kuantitas 0 ditolak
+        $resZero = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 0,
+        ]);
+        $resZero->assertSessionHasErrors('jumlah');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        // 2. Submit kuantitas negatif ditolak
+        $resNegative = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => -1,
+        ]);
+        $resNegative->assertSessionHasErrors('jumlah');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        // 3. Submit kuantitas melebihi stok ditolak
+        $resExceed = $this->actingAs($pengguna)->post(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => $alat->stok + 5,
+        ]);
+        $resExceed->assertSessionHas('error');
+        $this->assertEquals(0, KeranjangController::count($pengguna->id_user));
+
+        // 4. Submit kuantitas valid (misal 3 unit) via AJAX
+        $resAjax = $this->actingAs($pengguna)->postJson(route('pengguna.keranjang.tambah'), [
+            'kode_alat' => $alat->kode_alat,
+            'jumlah' => 3,
+        ]);
+        $resAjax->assertOk();
+        $resAjax->assertJson([
+            'success' => true,
+            'cart_count' => 3,
+        ]);
+        $this->assertEquals(3, KeranjangController::count($pengguna->id_user));
+
+        // 5. Verifikasi konsistensi dengan tampilan halaman keranjang belanja
+        $cartPageRes = $this->actingAs($pengguna)->get(route('pengguna.keranjang.index'));
+        $cartPageRes->assertStatus(200);
+        $cartPageRes->assertSee($alat->nama_alat);
+        $cartPageRes->assertSee('3 Unit');
+    }
 }

@@ -424,4 +424,294 @@ class KeranjangBelanjaTest extends TestCase
         $this->assertEquals($stokAwalAlt1 - 1, (int) Alat::where('kode_alat', 'ALT001')->value('stok'));
         $this->assertEquals($stokAwalAlt2 - 1, (int) Alat::where('kode_alat', 'ALT002')->value('stok'));
     }
+
+    /**
+     * Uji lengkap halaman keranjang belanja:
+     * - Menampilkan rincian alat (nama, kode, kategori, stok, tarif harian, jumlah unit, subtotal per hari, tombol hapus)
+     * - Menampilkan total jenis alat, total unit, dan total sementara per hari
+     * - Penambahan dan pengurangan unit memperbarui subtotal dan total sementara
+     * - Perubahan stok di database memicu peringatan stok dan menolak/mencegah checkout sampai disesuaikan
+     * - Menghapus barang memperbarui ringkasan
+     */
+    public function test_keranjang_belanja_unified_period_rules_and_stock_change_behavior(): void
+    {
+        $user = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($user->id_user);
+
+        $alat1 = Alat::where('kode_alat', 'ALT001')->first();
+        $alat1->stok = 10;
+        $alat1->save();
+
+        $alat2 = Alat::where('kode_alat', 'ALT002')->first();
+        $alat2->stok = 10;
+        $alat2->save();
+
+        // 1. Tambah dua jenis barang: ALT001 (2 unit @ 50.000) dan ALT002 (3 unit @ 25.000)
+        KeranjangController::add($user->id_user, 'ALT001', 2);
+        KeranjangController::add($user->id_user, 'ALT002', 3);
+
+        // 2. Buka halaman keranjang belanja
+        $response = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        $response->assertStatus(200);
+
+        // Verifikasi elemen tampilan
+        $response->assertSee($alat1->nama_alat);
+        $response->assertSee($alat1->kode_alat);
+        $response->assertSee($alat1->kategori);
+        $response->assertSee('Stok: 10 unit');
+        $response->assertSee($alat2->nama_alat);
+        $response->assertSee($alat2->kode_alat);
+
+        // Verifikasi jumlah jenis alat dan total unit
+        $response->assertSee('2 Jenis Alat');
+        $response->assertSee('5 Unit');
+
+        // Verifikasi subtotal per hari
+        // ALT001: 2 x 50.000 = 100.000
+        // ALT002: 3 x 25.000 = 75.000
+        // Total sementara / hari = 175.000
+        $response->assertSee('Rp 100.000');
+        $response->assertSee('Rp 75.000');
+        $response->assertSee('Total Sementara / Hari:');
+        $response->assertSee('Rp 175.000');
+        $response->assertSee('Lanjut ke Checkout');
+
+        // Memastikan tidak ada teks teknis rumus membingungkan
+        $response->assertDontSee('belum dikalikan durasi hari sewa');
+
+        // 3. Tambah unit ALT001 (menjadi 4 unit)
+        $this->actingAs($user)->post(route('pengguna.keranjang.update'), [
+            'kode_alat' => 'ALT001',
+            'jumlah' => 4,
+        ]);
+        $responseUpdate = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        // Total unit: 4 + 3 = 7
+        // Total sementara: (4 x 50.000) + (3 x 25.000) = 200.000 + 75.000 = 275.000
+        $responseUpdate->assertSee('7 Unit');
+        $responseUpdate->assertSee('Rp 275.000');
+
+        // 4. Kurangi unit ALT002 (menjadi 1 unit)
+        $this->actingAs($user)->post(route('pengguna.keranjang.update'), [
+            'kode_alat' => 'ALT002',
+            'jumlah' => 1,
+        ]);
+        $responseKurang = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        // Total unit: 4 + 1 = 5
+        // Total sementara: 200.000 + 25.000 = 225.000
+        $responseKurang->assertSee('5 Unit');
+        $responseKurang->assertSee('Rp 225.000');
+
+        // 5. Uji skenario stok berkurang di database di bawah kuantitas keranjang
+        // ALT001 di keranjang ada 4 unit, kita ubah stok fisik di DB menjadi 2 unit
+        $alat1->stok = 2;
+        $alat1->save();
+
+        $responseStokKurang = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        $responseStokKurang->assertSee('Perhatian Ketersediaan Stok');
+        $responseStokKurang->assertSee('Melebihi Stok! Tersedia: 2 unit');
+
+        // Mencoba langsung checkout saat stok kurang harus ditolak dan dialihkan kembali
+        $checkoutTry = $this->actingAs($user)->get(route('pengguna.checkout.index'));
+        $checkoutTry->assertRedirect(route('pengguna.keranjang.index'));
+        $checkoutTry->assertSessionHas('error');
+
+        // 6. Sesuaikan jumlah ALT001 ke batas stok yang valid (2 unit)
+        $this->actingAs($user)->post(route('pengguna.keranjang.update'), [
+            'kode_alat' => 'ALT001',
+            'jumlah' => 2,
+        ]);
+        $responseStokPas = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        $responseStokPas->assertDontSee('Perhatian Ketersediaan Stok');
+        $responseStokPas->assertSee('id="btnLanjutCheckout"', false);
+
+        // 7. Hapus salah satu barang (ALT002)
+        $this->actingAs($user)->post(route('pengguna.keranjang.hapus'), [
+            'kode_alat' => 'ALT002',
+        ]);
+        $responseHapus = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        $responseHapus->assertSee('1 Jenis Alat');
+        $responseHapus->assertSee('2 Unit');
+        $responseHapus->assertSee('Rp 100.000');
+        $responseHapus->assertDontSee($alat2->nama_alat);
+
+        // 8. Kosongkan keranjang
+        $this->actingAs($user)->post(route('pengguna.keranjang.kosongkan'));
+        $responseKosong = $this->actingAs($user)->get(route('pengguna.keranjang.index'));
+        $responseKosong->assertSee('Keranjang Belanja Masih Kosong');
+        $responseKosong->assertSee('Buka Katalog Alat Camping');
+
+        // Kembalikan stok alat1
+        $alat1->stok = 10;
+        $alat1->save();
+    }
+
+    /**
+     * Uji lengkap skenario halaman dan proses checkout:
+     * - Tampilan checkout (nama, kode, tarif harian, jumlah unit, subtotal per hari, durasi, biaya final, total, metode pembayaran, tombol konfirmasi)
+     * - Validasi tanggal kosong (tanggal_sewa / tanggal_kembali kosong)
+     * - Validasi tanggal sama (tanggal_kembali == tanggal_sewa)
+     * - Validasi tanggal terbalik (tanggal_kembali < tanggal_sewa)
+     * - Validasi keranjang kosong
+     * - Validasi stok berubah saat submission
+     * - Periode valid dan perhitungan harga di backend
+     * - Metode pembayaran (QRIS, Transfer Bank, Cash) dan penyimpanan pesanan
+     */
+    public function test_checkout_complete_validation_and_submission_scenarios(): void
+    {
+        $user = User::where('username', 'pelanggan')->first();
+        KeranjangController::clear($user->id_user);
+
+        $alat1 = Alat::where('kode_alat', 'ALT001')->first();
+        $alat1->stok = 10;
+        $alat1->tarif_sewa = 50000;
+        $alat1->save();
+
+        $alat2 = Alat::where('kode_alat', 'ALT002')->first();
+        $alat2->stok = 10;
+        $alat2->tarif_sewa = 25000;
+        $alat2->save();
+
+        // 1. Uji keranjang kosong dilarang checkout
+        $emptyCartCheckout = $this->actingAs($user)->get(route('pengguna.checkout.index'));
+        $emptyCartCheckout->assertRedirect(route('pengguna.katalog.index'));
+        $emptyCartCheckout->assertSessionHas('error');
+
+        $emptyCartSubmit = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => Carbon::tomorrow()->format('Y-m-d'),
+            'tanggal_kembali' => Carbon::tomorrow()->addDays(2)->format('Y-m-d'),
+            'metode_pembayaran' => 'Cash',
+        ]);
+        $emptyCartSubmit->assertSessionHasErrors(['items']);
+
+        // 2. Masukkan 2 barang ke keranjang: ALT001 (2 unit) & ALT002 (3 unit)
+        KeranjangController::add($user->id_user, 'ALT001', 2);
+        KeranjangController::add($user->id_user, 'ALT002', 3);
+
+        // 3. Tampilan Checkout: verifikasi seluruh elemen UI
+        $checkoutView = $this->actingAs($user)->get(route('pengguna.checkout.index'));
+        $checkoutView->assertStatus(200);
+
+        // Ringkasan barang: nama, kode, tarif harian, jumlah unit, subtotal per hari
+        $checkoutView->assertSee($alat1->nama_alat);
+        $checkoutView->assertSee($alat1->kode_alat);
+        $checkoutView->assertSee('2 unit');
+        $checkoutView->assertSee('Rp 50.000');
+        $checkoutView->assertSee('Subtotal / Hari: Rp 100.000');
+
+        $checkoutView->assertSee($alat2->nama_alat);
+        $checkoutView->assertSee($alat2->kode_alat);
+        $checkoutView->assertSee('3 unit');
+        $checkoutView->assertSee('Rp 25.000');
+        $checkoutView->assertSee('Subtotal / Hari: Rp 75.000');
+
+        // Form tanggal & durasi
+        $checkoutView->assertSee('Tanggal Mulai Sewa');
+        $checkoutView->assertSee('name="tanggal_sewa"', false);
+        $checkoutView->assertSee('Tanggal Kembali');
+        $checkoutView->assertSee('name="tanggal_kembali"', false);
+        $checkoutView->assertSee('id="labelDurasiSewa"', false);
+        $checkoutView->assertSee('id="labelGrandTotal"', false);
+
+        // Pilihan metode pembayaran
+        $checkoutView->assertSee('QRIS');
+        $checkoutView->assertSee('Transfer Bank');
+        $checkoutView->assertSee('Cash');
+
+        // Tombol konfirmasi
+        $checkoutView->assertSee('Konfirmasi & Lanjutkan Pesanan');
+
+        // 4. Uji validasi tanggal kosong
+        $resTglKosong = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => '',
+            'tanggal_kembali' => '',
+            'metode_pembayaran' => 'QRIS',
+        ]);
+        $resTglKosong->assertSessionHasErrors(['tanggal_sewa', 'tanggal_kembali']);
+
+        // 5. Uji validasi tanggal sama (tanggal_kembali == tanggal_sewa)
+        $tglHariIni = Carbon::tomorrow()->format('Y-m-d');
+        $resTglSama = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => $tglHariIni,
+            'tanggal_kembali' => $tglHariIni,
+            'metode_pembayaran' => 'QRIS',
+        ]);
+        $resTglSama->assertSessionHasErrors(['tanggal_kembali']);
+
+        // 6. Uji validasi tanggal terbalik (tanggal_kembali < tanggal_sewa)
+        $resTglTerbalik = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => Carbon::tomorrow()->addDays(3)->format('Y-m-d'),
+            'tanggal_kembali' => Carbon::tomorrow()->addDay()->format('Y-m-d'),
+            'metode_pembayaran' => 'QRIS',
+        ]);
+        $resTglTerbalik->assertSessionHasErrors(['tanggal_kembali']);
+
+        // 7. Uji metode pembayaran tidak valid
+        $resMetodeInvalid = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => Carbon::tomorrow()->format('Y-m-d'),
+            'tanggal_kembali' => Carbon::tomorrow()->addDays(2)->format('Y-m-d'),
+            'metode_pembayaran' => 'Bitcoin',
+        ]);
+        $resMetodeInvalid->assertSessionHasErrors(['metode_pembayaran']);
+
+        // 8. Uji stok berkurang di database di bawah kuantitas keranjang saat checkout
+        $alat1->stok = 1; // keranjang meminta 2 unit
+        $alat1->save();
+
+        $resStokBerkurang = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => Carbon::tomorrow()->format('Y-m-d'),
+            'tanggal_kembali' => Carbon::tomorrow()->addDays(3)->format('Y-m-d'),
+            'metode_pembayaran' => 'QRIS',
+        ]);
+        $resStokBerkurang->assertSessionHasErrors(['jumlah']);
+
+        // Kembalikan stok alat1
+        $alat1->stok = 10;
+        $alat1->save();
+
+        // 9. Uji periode valid dan penyimpanan pesanan
+        // Periode: 3 hari (misal tgl mulai s/d 3 hari ke depan)
+        // Perhitungan:
+        // ALT001: 2 unit x Rp 50.000 x 3 hari = Rp 300.000
+        // ALT002: 3 unit x Rp 25.000 x 3 hari = Rp 225.000
+        // Grand Total: Rp 525.000
+        $tglMulai = Carbon::now()->addDays(20)->format('Y-m-d');
+        $tglSelesai = Carbon::now()->addDays(23)->format('Y-m-d'); // 3 hari durasi
+
+        $resValid = $this->actingAs($user)->post(route('pengguna.checkout.store'), [
+            'tanggal_sewa' => $tglMulai,
+            'tanggal_kembali' => $tglSelesai,
+            'metode_pembayaran' => 'Transfer Bank',
+        ]);
+        $resValid->assertSessionHasNoErrors();
+        $resValid->assertRedirect(route('pengguna.dashboard'));
+        $resValid->assertSessionHas('success');
+
+        // Verifikasi transaksi di database
+        $trx = Penyewaan::where('id_user', $user->id_user)->latest('no_transaksi')->first();
+        $this->assertNotNull($trx);
+        $this->assertEquals(3, $trx->durasi_hari);
+        $this->assertEquals($tglMulai, Carbon::parse($trx->tanggal_sewa)->format('Y-m-d'));
+        $this->assertEquals($tglSelesai, Carbon::parse($trx->tanggal_kembali)->format('Y-m-d'));
+        $this->assertEquals('Menunggu Konfirmasi', $trx->status_penyewaan);
+        $this->assertEquals(525000.00, $trx->total_biaya);
+
+        // Verifikasi detail penyewaan
+        $this->assertCount(2, $trx->detailPenyewaan);
+        $detail1 = $trx->detailPenyewaan->where('kode_alat', 'ALT001')->first();
+        $this->assertEquals(2, $detail1->jumlah);
+        $this->assertEquals(300000.00, $detail1->subtotal_biaya);
+
+        $detail2 = $trx->detailPenyewaan->where('kode_alat', 'ALT002')->first();
+        $this->assertEquals(3, $detail2->jumlah);
+        $this->assertEquals(225000.00, $detail2->subtotal_biaya);
+
+        // Verifikasi pembayaran
+        $this->assertNotNull($trx->pembayaran);
+        $this->assertEquals(525000.00, (float) $trx->pembayaran->total_biaya);
+        $this->assertEquals('Transfer Bank', $trx->pembayaran->metode_pembayaran);
+        $this->assertEquals('Belum Dibayar', $trx->pembayaran->status_pembayaran);
+
+        // Verifikasi keranjang otomatis dikosongkan setelah pesanan berhasil disimpan
+        $this->assertEquals(0, KeranjangController::count($user->id_user));
+    }
 }

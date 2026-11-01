@@ -26,6 +26,10 @@
         <h4 class="mb-0 fw-bold font-monospace text-dark">{{ $penyewaan->no_transaksi }}</h4>
     </div>
     <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('pemilik.transaksi.nota', $penyewaan->no_transaksi) }}" target="_blank" class="btn btn-outline-dark btn-sm d-flex align-items-center gap-1 shadow-sm" id="btn-cetak-nota-pemilik">
+            <span>🖨️</span>
+            <span>Cetak Nota</span>
+        </a>
         <x-status-badge :status="$penyewaan->status_penyewaan" />
         <x-status-badge :status="$penyewaan->status_pembayaran" />
     </div>

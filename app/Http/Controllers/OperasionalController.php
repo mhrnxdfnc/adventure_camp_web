@@ -29,7 +29,7 @@ class OperasionalController extends Controller
             ->where(function ($q) {
                 $q->where('status_penyewaan', 'Siap Diambil')
                     ->orWhere(function ($sub) {
-                        $sub->where('status_penyewaan', 'Disetujui')
+                        $sub->whereIn('status_penyewaan', ['Disetujui', 'Menunggu Pembayaran'])
                             ->whereHas('pembayaran', function ($p) {
                                 $p->where('status_pembayaran', 'Lunas');
                             });
@@ -237,6 +237,7 @@ class OperasionalController extends Controller
             'nominal_denda' => ['nullable', 'numeric', 'min:0'],
             'alasan_denda' => ['nullable', 'string', 'max:255'],
             'catatan' => ['nullable', 'string', 'max:500'],
+            'pengembalian_sebagian' => ['nullable', 'boolean'],
         ], [
             'tanggal_pengembalian_aktual.required' => 'Tanggal pengembalian aktual wajib diisi.',
             'tanggal_pengembalian_aktual.after_or_equal' => 'Tanggal pengembalian tidak boleh sebelum tanggal sewa.',
@@ -258,36 +259,64 @@ class OperasionalController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                // Cegah pengembalian dan denda ganda
-                if (! $trx->isSedangDisewa() || $trx->isSelesai() || $trx->pengembalian()->exists()) {
+                // Cegah pengembalian jika transaksi sudah selesai
+                if (! $trx->isSedangDisewa() || $trx->isSelesai()) {
                     throw new \DomainException("Transaksi {$trx->no_transaksi} sudah selesai dan telah dikembalikan sebelumnya.");
                 }
 
+                $isPartialAllowed = $request->boolean('pengembalian_sebagian');
                 $itemsInput = $request->input('items', []);
                 $ringkasanKondisi = [];
                 $adaKerusakan = false;
+                $totalUnitDikembalikanKaliIni = 0;
 
                 // Proses setiap item alat dan pembaruan stok sesuai kondisi aktual
                 foreach ($trx->detailPenyewaan as $detail) {
-                    $itemData = $itemsInput[$detail->kode_alat] ?? [];
+                    // Cari berdasarkan id_detail (unik per baris) atau fallback kode_alat (backward compatibility)
+                    $itemData = $itemsInput[$detail->id_detail] ?? $itemsInput[$detail->kode_alat] ?? null;
+
+                    $jumlahAcuan = $detail->jumlah_diserahkan > 0 ? (int) $detail->jumlah_diserahkan : (int) $detail->jumlah;
+                    $sudahKembali = (int) $detail->jumlah_kembali_baik + (int) $detail->jumlah_perlu_perbaikan + (int) $detail->jumlah_rusak;
+                    $sisaBelumKembali = max(0, $jumlahAcuan - $sudahKembali);
+
+                    if ($sisaBelumKembali === 0) {
+                        continue;
+                    }
+
+                    if ($itemData === null) {
+                        if (! $isPartialAllowed) {
+                            throw new \DomainException("Data pengembalian untuk [{$detail->kode_alat}] tidak ditemukan.");
+                        }
+
+                        continue;
+                    }
+
                     $jumlahBaik = max(0, (int) ($itemData['baik'] ?? 0));
                     $jumlahPerbaikan = max(0, (int) ($itemData['perlu_perbaikan'] ?? 0));
                     $jumlahRusak = max(0, (int) ($itemData['rusak'] ?? 0));
                     $totalKembali = $jumlahBaik + $jumlahPerbaikan + $jumlahRusak;
 
-                    $jumlahAcuan = $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah;
-
-                    if ($totalKembali !== $jumlahAcuan) {
-                        throw new \DomainException("Jumlah alat kembali untuk [{$detail->kode_alat}] ({$totalKembali} unit) harus sama dengan jumlah yang disewa ({$jumlahAcuan} unit).");
+                    if ($totalKembali > $sisaBelumKembali) {
+                        throw new \DomainException("Jumlah alat kembali untuk [{$detail->kode_alat}] ({$totalKembali} unit) tidak boleh melebihi sisa yang disewa ({$sisaBelumKembali} unit).");
                     }
 
-                    // Simpan kuantitas kondisi aktual ke detail_penyewaan
-                    $detail->jumlah_kembali_baik = $jumlahBaik;
-                    $detail->jumlah_perlu_perbaikan = $jumlahPerbaikan;
-                    $detail->jumlah_rusak = $jumlahRusak;
+                    if (! $isPartialAllowed && $totalKembali !== $sisaBelumKembali) {
+                        throw new \DomainException("Jumlah alat kembali untuk [{$detail->kode_alat}] ({$totalKembali} unit) harus sama dengan jumlah yang disewa ({$sisaBelumKembali} unit).");
+                    }
+
+                    if ($totalKembali === 0) {
+                        continue;
+                    }
+
+                    $totalUnitDikembalikanKaliIni += $totalKembali;
+
+                    // Akumulasi kuantitas kondisi aktual ke detail_penyewaan
+                    $detail->jumlah_kembali_baik = (int) $detail->jumlah_kembali_baik + $jumlahBaik;
+                    $detail->jumlah_perlu_perbaikan = (int) $detail->jumlah_perlu_perbaikan + $jumlahPerbaikan;
+                    $detail->jumlah_rusak = (int) $detail->jumlah_rusak + $jumlahRusak;
                     $detail->save();
 
-                    // Requirement 7 & 11: Hanya alat berkondisi BAIK yang dikembalikan ke stok siap sewa
+                    // Requirement 7 & 11: Hanya alat berkondisi BAIK yang dikembalikan ke stok siap sewa toko
                     $alat = Alat::where('kode_alat', $detail->kode_alat)->lockForUpdate()->first();
                     if ($alat) {
                         $stokSebelum = (int) $alat->stok;
@@ -333,27 +362,47 @@ class OperasionalController extends Controller
                     $ringkasanKondisi[] = "{$detail->kode_alat}: ".implode(', ', $partRingkasan);
                 }
 
-                $kondisiTeks = empty($ringkasanKondisi) ? 'Baik' : implode('; ', $ringkasanKondisi);
-                $statusPengembalian = ($adaKerusakan || $nominalDenda > 0) ? 'Bermasalah' : 'Selesai';
+                if ($totalUnitDikembalikanKaliIni === 0) {
+                    throw new \DomainException('Tidak ada unit alat yang dikembalikan pada pemeriksaan ini.');
+                }
 
-                // Catat ke tabel pengembalian
-                $pengembalian = new Pengembalian;
-                $pengembalian->no_transaksi = $trx->no_transaksi;
-                $pengembalian->tanggal_pengembalian_aktual = $request->input('tanggal_pengembalian_aktual');
-                $pengembalian->kondisi_alat = $kondisiTeks;
-                $pengembalian->status_pengembalian = $statusPengembalian;
-                $pengembalian->id_admin = Auth::id();
-                $pengembalian->catatan = $request->input('catatan');
-                $pengembalian->save();
+                // Periksa apakah seluruh detail pada transaksi sudah lunas dikembalikan
+                $trx->refresh();
+                $semuaSelesai = true;
+                foreach ($trx->detailPenyewaan as $detail) {
+                    $acuan = $detail->jumlah_diserahkan > 0 ? (int) $detail->jumlah_diserahkan : (int) $detail->jumlah;
+                    $kembali = (int) $detail->jumlah_kembali_baik + (int) $detail->jumlah_perlu_perbaikan + (int) $detail->jumlah_rusak;
+                    if ($kembali < $acuan) {
+                        $semuaSelesai = false;
+                        break;
+                    }
+                }
+
+                $kondisiTeks = empty($ringkasanKondisi) ? 'Baik' : implode('; ', $ringkasanKondisi);
+                $statusPengembalian = ($adaKerusakan || $nominalDenda > 0) ? 'Bermasalah' : ($semuaSelesai ? 'Selesai' : 'Sebagian');
+
+                // Catat / Update ke tabel pengembalian (karena no_transaksi UNIQUE di database)
+                $pengembalian = Pengembalian::updateOrCreate(
+                    ['no_transaksi' => $trx->no_transaksi],
+                    [
+                        'tanggal_pengembalian_aktual' => $request->input('tanggal_pengembalian_aktual'),
+                        'kondisi_alat' => $kondisiTeks,
+                        'status_pengembalian' => $statusPengembalian,
+                        'id_admin' => Auth::id(),
+                        'catatan' => $request->input('catatan'),
+                    ]
+                );
 
                 // Requirement 8, 9, 10: Catat denda jika berlaku dan pastikan tidak ganda
                 if ($nominalDenda > 0) {
-                    $denda = new Denda;
-                    $denda->id_pengembalian = $pengembalian->id_pengembalian;
-                    $denda->tarif_denda = $nominalDenda;
-                    $denda->nominal_denda = $nominalDenda;
-                    $denda->alasan_denda = $alasanDenda;
-                    $denda->save();
+                    Denda::updateOrCreate(
+                        ['id_pengembalian' => $pengembalian->id_pengembalian],
+                        [
+                            'tarif_denda' => $nominalDenda,
+                            'nominal_denda' => $nominalDenda,
+                            'alasan_denda' => $alasanDenda,
+                        ]
+                    );
 
                     ActivityLog::record(
                         Auth::id(),
@@ -372,8 +421,8 @@ class OperasionalController extends Controller
                     );
                 }
 
-                // Ubah status pesanan menjadi Selesai
-                $trx->status_penyewaan = 'Selesai';
+                // Ubah status pesanan: jika semua unit sudah kembali -> Selesai, jika belum -> tetap Sedang Disewa
+                $trx->status_penyewaan = $semuaSelesai ? 'Selesai' : 'Sedang Disewa';
                 $trx->save();
 
                 // Audit Trail
@@ -381,16 +430,21 @@ class OperasionalController extends Controller
                     Auth::id(),
                     'Memproses Pengembalian Alat',
                     'Pengembalian',
-                    "No Transaksi: {$trx->no_transaksi}, Tanggal Kembali: {$pengembalian->tanggal_pengembalian_aktual}, Kondisi: {$kondisiTeks}, Denda: Rp ".number_format($nominalDenda, 0, ',', '.')
+                    "No Transaksi: {$trx->no_transaksi}, Status: {$trx->status_penyewaan}, Kondisi: {$kondisiTeks}, Denda: Rp ".number_format($nominalDenda, 0, ',', '.')
                 );
             });
         } catch (\DomainException $e) {
             return redirect()->route('admin.operasional.pengembalian')->with('error', $e->getMessage());
         }
 
-        return redirect()->route('admin.operasional.pengembalian')->with(
-            'success',
-            "Pengembalian alat untuk pesanan {$no_transaksi} berhasil diproses. Status transaksi kini Selesai."
-        );
+        $pesanSukses = "Pengembalian alat untuk pesanan {$no_transaksi} berhasil diproses.";
+        $trxCek = Penyewaan::find($no_transaksi);
+        if ($trxCek && $trxCek->isSelesai()) {
+            $pesanSukses .= ' Status transaksi kini Selesai.';
+        } else {
+            $pesanSukses .= ' Pengembalian sebagian berhasil dicatat, pesanan tetap aktif menunggu sisa unit.';
+        }
+
+        return redirect()->route('admin.operasional.pengembalian')->with('success', $pesanSukses);
     }
 }

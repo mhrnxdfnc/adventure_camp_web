@@ -13,18 +13,30 @@
     </a>
 </div>
 
+<!-- Informasi Status Verifikasi Admin -->
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4 py-2.5 px-3 small border-0 shadow-sm" style="border-radius:8px;">
+    <span class="fs-5">ℹ️</span>
+    <div>
+        <strong>Pemeriksaan Ketersediaan:</strong> Semua pesanan berstatus <em>Menunggu Konfirmasi</em>. Admin akan memeriksa ketersediaan fisik alat untuk tanggal yang Anda ajukan sebelum pesanan disetujui dan instruksi pembayaran diterbitkan.
+    </div>
+</div>
+
 <form action="{{ route('pengguna.checkout.store') }}" method="POST" id="formCheckout">
     @csrf
 
     <div class="row g-4">
-        <!-- Kolom Kiri: Form Parameter Sewa & Metode Pembayaran -->
+        <!-- Kolom Kiri: Form Parameter Sewa Bersama & Metode Pembayaran -->
         <div class="col-12 col-lg-7">
-            <!-- Kartu 1: Periode Sewa -->
+            <!-- Kartu 1: Periode Sewa Bersama -->
             <div class="ac-card mb-4">
                 <div class="ac-card-header">
-                    <h4 class="ac-card-title fs-6 mb-0">📅 Tentukan Periode Waktu Sewa</h4>
+                    <h4 class="ac-card-title fs-6 mb-0">📅 Tentukan Periode Waktu Sewa Bersama</h4>
                 </div>
                 <div class="ac-card-body">
+                    <p class="text-muted small mb-3">
+                        Seluruh peralatan dalam keranjang menggunakan satu tanggal mulai dan satu tanggal kembali yang sama.
+                    </p>
+
                     <div class="row g-3">
                         <div class="col-12 col-sm-6">
                             <label class="form-label font-weight-bold small">
@@ -45,7 +57,7 @@
 
                         <div class="col-12 col-sm-6">
                             <label class="form-label font-weight-bold small">
-                                Tanggal Pengembalian <span class="text-danger">*</span>
+                                Tanggal Kembali <span class="text-danger">*</span>
                             </label>
                             <input type="date" 
                                    name="tanggal_kembali" 
@@ -61,8 +73,11 @@
                         </div>
                     </div>
 
-                    <div class="mt-3 p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
-                        <span class="small text-muted">Durasi Waktu Sewa Dihitung:</span>
+                    <div class="mt-3 p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <span class="small text-muted d-block">Durasi Waktu Sewa:</span>
+                            <small class="text-muted" style="font-size:0.75rem;">* Dihitung dari selisih hari kalender (tanggal kembali - tanggal mulai).</small>
+                        </div>
                         <span class="badge bg-success fs-6 font-monospace" id="labelDurasiSewa">{{ $durasiDefault }} Hari</span>
                     </div>
                 </div>
@@ -75,7 +90,7 @@
                 </div>
                 <div class="ac-card-body">
                     <p class="text-muted small mb-3">
-                        Pilih kanal pembayaran resmi Adventure Camp. Instruksi pembayaran lengkap akan diterbitkan setelah pesanan dikonfirmasi oleh Admin.
+                        Pilih metode pembayaran yang Anda inginkan. Detail dan instruksi lengkap akan diterbitkan setelah pesanan disetujui oleh Admin.
                     </p>
 
                     <div class="d-flex flex-column gap-2">
@@ -85,7 +100,7 @@
                                 <span style="font-size:1.5rem;">📱</span>
                                 <div>
                                     <strong class="d-block text-dark">QRIS (Kasir / Pembayaran Cepat)</strong>
-                                    <small class="text-muted">Mendukung GoPay, OVO, Dana, ShopeePay, BCA Mobile, dan aplikasi perbankan lainnya.</small>
+                                    <small class="text-muted">Mendukung GoPay, OVO, Dana, ShopeePay, BCA Mobile, dan aplikasi e-wallet / perbankan lainnya.</small>
                                 </div>
                             </div>
                         </label>
@@ -96,7 +111,7 @@
                                 <span style="font-size:1.5rem;">🏦</span>
                                 <div>
                                     <strong class="d-block text-dark">Transfer Bank Resmi</strong>
-                                    <small class="text-muted">Transfer manual ke rekening Bank BCA / Mandiri / BRI Adventure Camp.</small>
+                                    <small class="text-muted">Transfer manual ke nomor rekening bank resmi Adventure Camp.</small>
                                 </div>
                             </div>
                         </label>
@@ -107,7 +122,7 @@
                                 <span style="font-size:1.5rem;">💵</span>
                                 <div>
                                     <strong class="d-block text-dark">Tunai / Cash di Basecamp</strong>
-                                    <small class="text-muted">Pembayaran langsung saat pengambilan alat di store Adventure Camp.</small>
+                                    <small class="text-muted">Pembayaran langsung kepada kasir saat pengambilan perlengkapan di toko.</small>
                                 </div>
                             </div>
                         </label>
@@ -119,27 +134,31 @@
                 </div>
             </div>
 
-            <!-- Kartu 3: Data Penyewa -->
+            <!-- Kartu 3: Data Pelanggan / Penyewa -->
             <div class="ac-card">
                 <div class="ac-card-header">
                     <h4 class="ac-card-title fs-6 mb-0">👤 Informasi Pelanggan / Penyewa</h4>
                 </div>
                 <div class="ac-card-body small">
                     <div class="row g-2">
-                        <div class="col-sm-6">
+                        <div class="col-sm-4">
                             <span class="text-muted d-block">Nama Lengkap:</span>
                             <strong class="text-dark">{{ Auth::user()->nama_user }}</strong>
                         </div>
-                        <div class="col-sm-6">
-                            <span class="text-muted d-block">Akun Username:</span>
+                        <div class="col-sm-4">
+                            <span class="text-muted d-block">Username Akun:</span>
                             <span class="font-monospace text-secondary">{{ Auth::user()->username }}</span>
+                        </div>
+                        <div class="col-sm-4">
+                            <span class="text-muted d-block">Status Pesanan:</span>
+                            <span class="badge bg-warning text-dark">Menunggu Konfirmasi Admin</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Kolom Kanan: Ringkasan Rincian Seluruh Alat & Total Tagihan -->
+        <!-- Kolom Kanan: Ringkasan Rincian Seluruh Alat & Biaya Final -->
         <div class="col-12 col-lg-5">
             <div class="ac-card position-sticky" style="top: 1rem;">
                 <div class="ac-card-header d-flex justify-content-between align-items-center">
@@ -150,28 +169,41 @@
                 </div>
 
                 <div class="ac-card-body">
+                    <!-- Daftar Rincian Barang -->
                     <div class="p-2 bg-light rounded-3 mb-3 border">
                         <div class="list-group list-group-flush bg-transparent">
                             @foreach($cartItems as $index => $item)
+                                @php
+                                    $subtotalPerHariItem = (float) $item['tarif_sewa'] * (int) $item['jumlah'];
+                                    $subtotalFinalItem = \App\Models\Penyewaan::hitungTotalBiaya($item['tarif_sewa'], $item['jumlah'], $durasiDefault);
+                                @endphp
                                 <div class="list-group-item bg-transparent px-2 py-2 border-bottom">
                                     <div class="d-flex justify-content-between align-items-start mb-1">
                                         <div>
-                                            <strong class="text-dark" style="font-size:0.95rem;">{{ $item['nama_alat'] }}</strong>
-                                            <small class="text-muted d-block">
-                                                {{ $item['jumlah'] }} unit &times; Rp {{ number_format($item['tarif_sewa'], 0, ',', '.') }}
-                                            </small>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <strong class="text-dark" style="font-size:0.95rem;">{{ $item['nama_alat'] }}</strong>
+                                                <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size:0.7rem;">{{ $item['kode_alat'] }}</span>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <span>{{ $item['kategori'] }}</span> &bull;
+                                                <span>{{ $item['jumlah'] }} unit &times; Rp {{ number_format($item['tarif_sewa'], 0, ',', '.') }}/hari</span>
+                                            </div>
+                                            <div class="small text-muted font-monospace" style="font-size:0.75rem;">
+                                                Subtotal / Hari: Rp {{ number_format($subtotalPerHariItem, 0, ',', '.') }}
+                                            </div>
                                         </div>
                                         <div class="text-end">
-                                            <strong class="text-dark font-monospace item-subtotal" 
+                                            <small class="text-muted d-block" style="font-size:0.75rem;">Biaya Final:</small>
+                                            <strong class="text-success font-monospace item-subtotal" 
                                                     id="subtotal_{{ $item['kode_alat'] }}"
                                                     data-tarif="{{ $item['tarif_sewa'] }}"
                                                     data-jumlah="{{ $item['jumlah'] }}">
-                                                Rp {{ number_format($item['tarif_sewa'] * $item['jumlah'] * $durasiDefault, 0, ',', '.') }}
+                                                Rp {{ number_format($subtotalFinalItem, 0, ',', '.') }}
                                             </strong>
                                         </div>
                                     </div>
-                                    <div class="small text-muted font-monospace" id="calc_text_{{ $item['kode_alat'] }}" style="font-size:0.75rem;">
-                                        {{ $item['jumlah'] }} &times; Rp {{ number_format($item['tarif_sewa'], 0, ',', '.') }} &times; {{ $durasiDefault }} hari
+                                    <div class="small text-muted font-monospace text-end" id="calc_text_{{ $item['kode_alat'] }}" style="font-size:0.75rem;">
+                                        {{ $item['jumlah'] }} unit &times; Rp {{ number_format($item['tarif_sewa'], 0, ',', '.') }} &times; {{ $durasiDefault }} hari
                                     </div>
                                 </div>
                             @endforeach
@@ -184,31 +216,38 @@
                             <span>Total Unit Barang:</span>
                             <span class="text-dark fw-bold">{{ $totalUnits }} Unit</span>
                         </div>
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Total Subtotal / Hari:</span>
+                            <span class="text-dark fw-bold font-monospace">Rp {{ number_format($totalSubtotalPerHari, 0, ',', '.') }} / hari</span>
+                        </div>
                         <div class="d-flex justify-content-between small text-muted mb-2">
-                            <span>Lama Sewa:</span>
+                            <span>Lama Sewa Bersama:</span>
                             <span class="text-dark fw-bold" id="labelDurasiRingkasan">{{ $durasiDefault }} Hari</span>
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <strong class="text-dark" style="font-size:1rem;">Total Tagihan:</strong>
-                            <strong class="text-success fs-4 font-monospace" id="labelGrandTotal">
+                            <div>
+                                <strong class="text-dark d-block" style="font-size:1rem;">Total Tagihan:</strong>
+                                <small class="text-muted" style="font-size:0.75rem;">* Subtotal harian &times; durasi sewa</small>
+                            </div>
+                            <strong class="text-success fs-3 font-monospace" id="labelGrandTotal">
                                 Rp {{ number_format($totalSubtotalPerHari * $durasiDefault, 0, ',', '.') }}
                             </strong>
                         </div>
                     </div>
 
-                    <!-- Tombol Lanjutkan Pesanan dengan Pencegahan Double Submit -->
+                    <!-- Tombol Konfirmasi & Lanjutkan Pesanan dengan Pencegahan Double Submit -->
                     <button type="submit" 
                             class="btn btn-ac-primary w-100 py-3 font-weight-bold d-flex align-items-center justify-content-center gap-2" 
                             id="btnLanjutkanPesanan">
-                        <span>Lanjutkan Pesanan</span>
+                        <span>Konfirmasi &amp; Lanjutkan Pesanan</span>
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                         </svg>
                     </button>
 
                     <small class="text-muted d-block text-center mt-2" style="font-size:0.75rem;">
-                        Admin akan memeriksa ketersediaan stok fisik untuk tanggal sewa yang dipilih sebelum pesanan disetujui.
+                        Admin akan memeriksa ketersediaan stok fisik untuk tanggal yang diminta sebelum persetujuan pesanan.
                     </small>
                 </div>
             </div>
@@ -223,7 +262,7 @@
         const sewaInput = document.getElementById('tanggalSewa');
         const kembaliInput = document.getElementById('tanggalKembali');
         if (sewaInput.value) {
-            const d = new Date(sewaInput.value);
+            const d = new Date(sewaInput.value + 'T00:00:00');
             d.setDate(d.getDate() + 1);
             const minKembali = d.toISOString().split('T')[0];
             kembaliInput.min = minKembali;
@@ -235,17 +274,21 @@
     }
 
     function hitungSemuaBiaya() {
-        const sewaStr = document.getElementById('tanggalSewa').value;
-        const kembaliStr = document.getElementById('tanggalKembali').value;
+        const sewaInput = document.getElementById('tanggalSewa');
+        const kembaliInput = document.getElementById('tanggalKembali');
+        const sewaStr = sewaInput.value;
+        const kembaliStr = kembaliInput.value;
 
-        let durasi = 1;
-        if (sewaStr && kembaliStr) {
-            const d1 = new Date(sewaStr);
-            const d2 = new Date(kembaliStr);
-            const diffTime = d2 - d1;
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            durasi = Math.max(1, diffDays);
+        if (!sewaStr || !kembaliStr) {
+            return;
         }
+
+        const d1 = new Date(sewaStr + 'T00:00:00');
+        const d2 = new Date(kembaliStr + 'T00:00:00');
+        const diffTime = d2.getTime() - d1.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        const durasi = Math.max(1, diffDays);
 
         document.getElementById('labelDurasiSewa').textContent = durasi + ' Hari';
         document.getElementById('labelDurasiRingkasan').textContent = durasi + ' Hari';
@@ -255,17 +298,18 @@
         cartItemsData.forEach(item => {
             const tarif = parseFloat(item.tarif_sewa);
             const jumlah = parseInt(item.jumlah);
-            const subtotal = tarif * jumlah * durasi;
-            grandTotal += subtotal;
+            const subtotalPerHari = tarif * jumlah;
+            const subtotalFinal = subtotalPerHari * durasi;
+            grandTotal += subtotalFinal;
 
             const elSubtotal = document.getElementById('subtotal_' + item.kode_alat);
             if (elSubtotal) {
-                elSubtotal.textContent = 'Rp ' + subtotal.toLocaleString('id-ID');
+                elSubtotal.textContent = 'Rp ' + subtotalFinal.toLocaleString('id-ID');
             }
 
             const elCalc = document.getElementById('calc_text_' + item.kode_alat);
             if (elCalc) {
-                elCalc.textContent = jumlah + ' × Rp ' + tarif.toLocaleString('id-ID') + ' × ' + durasi + ' hari';
+                elCalc.textContent = jumlah + ' unit × Rp ' + tarif.toLocaleString('id-ID') + ' × ' + durasi + ' hari';
             }
         });
 

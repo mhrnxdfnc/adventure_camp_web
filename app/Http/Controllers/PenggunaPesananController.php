@@ -76,7 +76,7 @@ class PenggunaPesananController extends Controller
         if (empty($orderItems)) {
             return back()->withErrors([
                 'items' => 'Tidak ada alat camping yang dipilih dalam pesanan. Silakan tambahkan alat ke keranjang belanja.',
-            ])->withInput();
+            ])->with('error', 'Keranjang belanja Anda masih kosong. Silakan pilih alat camping dari katalog terlebih dahulu.')->withInput();
         }
 
         // 3. Pastikan akun memiliki profil pelanggan
@@ -200,7 +200,7 @@ class PenggunaPesananController extends Controller
                 return $noTrx;
             });
         } catch (\DomainException $e) {
-            return back()->withErrors(['jumlah' => $e->getMessage()])->withInput();
+            return back()->withErrors(['jumlah' => $e->getMessage()])->with('error', $e->getMessage())->withInput();
         }
 
         return redirect()->route('pengguna.dashboard')->with(

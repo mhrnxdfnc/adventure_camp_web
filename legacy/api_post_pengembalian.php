@@ -1,36 +1,36 @@
 <?php
 
-include "koneksi.php";
+include 'koneksi.php';
 
-$data = json_decode(file_get_contents("php://input"), true);
+$data = json_decode(file_get_contents('php://input'), true);
 
 $no_transaksi =
-    trim($data["no_transaksi"] ?? "");
+    trim($data['no_transaksi'] ?? '');
 
 $kondisi =
-    trim($data["kondisi_alat"] ?? "");
+    trim($data['kondisi_alat'] ?? '');
 
 $statusPengembalian =
-    $data["status_pengembalian"] ?? "Selesai";
+    $data['status_pengembalian'] ?? 'Selesai';
 
 $nominalDenda =
-    (float)($data["nominal_denda"] ?? 0);
+    (float) ($data['nominal_denda'] ?? 0);
 
 $alasanDenda =
-    trim($data["alasan_denda"] ?? "");
+    trim($data['alasan_denda'] ?? '');
 
 $idUser =
-    (int)($data["id_user"] ?? 0);
+    (int) ($data['id_user'] ?? 0);
 
 if (
-    $no_transaksi === "" ||
-    $kondisi === "" ||
+    $no_transaksi === '' ||
+    $kondisi === '' ||
     $idUser <= 0
 ) {
 
     echo json_encode([
-        "status" => "error",
-        "message" => "Data pengembalian belum lengkap"
+        'status' => 'error',
+        'message' => 'Data pengembalian belum lengkap',
     ]);
 
     exit;
@@ -44,15 +44,15 @@ try {
       Pastikan transaksi ada
     */
 
-    $stmtCek = $conn->prepare("
+    $stmtCek = $conn->prepare('
         SELECT status_penyewaan
         FROM penyewaan
         WHERE no_transaksi = ?
         FOR UPDATE
-    ");
+    ');
 
     $stmtCek->bind_param(
-        "s",
+        's',
         $no_transaksi
     );
 
@@ -63,35 +63,34 @@ try {
 
     if ($resultCek->num_rows === 0) {
         throw new Exception(
-            "Transaksi tidak ditemukan"
+            'Transaksi tidak ditemukan'
         );
     }
 
     $transaksi =
         $resultCek->fetch_assoc();
 
-    if ($transaksi["status_penyewaan"] !== "Berjalan") {
+    if ($transaksi['status_penyewaan'] !== 'Berjalan') {
 
         throw new Exception(
-            "Transaksi sudah tidak berstatus Berjalan"
+            'Transaksi sudah tidak berstatus Berjalan'
         );
     }
-
 
     /*
       Ambil detail alat
     */
 
-    $stmtDetail = $conn->prepare("
+    $stmtDetail = $conn->prepare('
         SELECT
             kode_alat,
             jumlah
         FROM detail_penyewaan
         WHERE no_transaksi = ?
-    ");
+    ');
 
     $stmtDetail->bind_param(
-        "s",
+        's',
         $no_transaksi
     );
 
@@ -100,28 +99,26 @@ try {
     $resultDetail =
         $stmtDetail->get_result();
 
-
     /*
       Kembalikan stok
     */
 
     while ($item = $resultDetail->fetch_assoc()) {
 
-        $stmtStok = $conn->prepare("
+        $stmtStok = $conn->prepare('
             UPDATE alat
             SET stok = stok + ?
             WHERE kode_alat = ?
-        ");
+        ');
 
         $stmtStok->bind_param(
-            "is",
-            $item["jumlah"],
-            $item["kode_alat"]
+            'is',
+            $item['jumlah'],
+            $item['kode_alat']
         );
 
         $stmtStok->execute();
     }
-
 
     /*
       Update transaksi
@@ -134,20 +131,19 @@ try {
     ");
 
     $stmtUpdate->bind_param(
-        "s",
+        's',
         $no_transaksi
     );
 
     $stmtUpdate->execute();
 
-
     /*
       Insert pengembalian
     */
 
-    $tanggal = date("Y-m-d");
+    $tanggal = date('Y-m-d');
 
-    $stmtReturn = $conn->prepare("
+    $stmtReturn = $conn->prepare('
         INSERT INTO pengembalian
         (
             no_transaksi,
@@ -156,10 +152,10 @@ try {
             status_pengembalian
         )
         VALUES (?, ?, ?, ?)
-    ");
+    ');
 
     $stmtReturn->bind_param(
-        "ssss",
+        'ssss',
         $no_transaksi,
         $tanggal,
         $kondisi,
@@ -171,7 +167,6 @@ try {
     $idPengembalian =
         $conn->insert_id;
 
-
     /*
       Denda
     */
@@ -181,7 +176,7 @@ try {
         $tarifDenda =
             $nominalDenda;
 
-        $stmtDenda = $conn->prepare("
+        $stmtDenda = $conn->prepare('
             INSERT INTO denda
             (
                 id_pengembalian,
@@ -190,10 +185,10 @@ try {
                 alasan_denda
             )
             VALUES (?, ?, ?, ?)
-        ");
+        ');
 
         $stmtDenda->bind_param(
-            "idds",
+            'idds',
             $idPengembalian,
             $tarifDenda,
             $nominalDenda,
@@ -203,18 +198,17 @@ try {
         $stmtDenda->execute();
     }
 
-
     /*
       Audit
     */
 
     $aktivitas =
-        "Memproses pengembalian";
+        'Memproses pengembalian';
 
     $modul =
-        "Pengembalian";
+        'Pengembalian';
 
-    $stmtLog = $conn->prepare("
+    $stmtLog = $conn->prepare('
         INSERT INTO activity_logs
         (
             id_user,
@@ -223,10 +217,10 @@ try {
             data_diproses
         )
         VALUES (?, ?, ?, ?)
-    ");
+    ');
 
     $stmtLog->bind_param(
-        "isss",
+        'isss',
         $idUser,
         $aktivitas,
         $modul,
@@ -235,12 +229,11 @@ try {
 
     $stmtLog->execute();
 
-
     $conn->commit();
 
     echo json_encode([
-        "status" => "success",
-        "message" => "Pengembalian berhasil diproses"
+        'status' => 'success',
+        'message' => 'Pengembalian berhasil diproses',
     ]);
 
 } catch (Exception $e) {
@@ -248,8 +241,8 @@ try {
     $conn->rollback();
 
     echo json_encode([
-        "status" => "error",
-        "message" => $e->getMessage()
+        'status' => 'error',
+        'message' => $e->getMessage(),
     ]);
 }
 

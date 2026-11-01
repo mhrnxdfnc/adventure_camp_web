@@ -17,9 +17,15 @@
             <h2 class="h4 font-weight-bold mb-1 text-dark">{{ $alat->nama_alat }} ({{ $alat->kode_alat }})</h2>
             <p class="text-muted small mb-0">Kategori: <strong>{{ $alat->kategori }}</strong> &bull; Tarif: <strong>{{ $alat->formatted_tarif }}/hari</strong></p>
         </div>
-        <div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ route('admin.inventaris.pembelian.create', ['kode_alat' => $alat->kode_alat]) }}" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 shadow-sm" id="btn-beli-stok-supplier">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span>Beli Stok via PO Supplier</span>
+            </a>
             <a href="{{ route('admin.inventaris.index') }}" class="btn btn-outline-secondary btn-sm">
-                &larr; Kembali ke Daftar Inventaris
+                &larr; Kembali ke Daftar
             </a>
         </div>
     </div>
@@ -83,8 +89,13 @@
                 <span class="ac-stat-label">Sedang Disewa</span>
                 <div class="ac-stat-icon-wrap" style="background-color: #fef3c7; color: #b45309;">🏕️</div>
             </div>
-            <div class="ac-stat-value text-warning font-monospace">{{ $stokDialokasikan }}</div>
-            <div class="ac-stat-sub">Di tangan pelanggan</div>
+            <div class="ac-stat-value text-warning font-monospace">{{ $stokSedangDisewa }}</div>
+            <div class="ac-stat-sub">
+                Di tangan pelanggan
+                @if($stokDialokasikan > 0)
+                    &bull; <span class="text-primary">{{ $stokDialokasikan }} di toko</span>
+                @endif
+            </div>
         </div>
     </div>
     <div class="col-6 col-md">
@@ -147,14 +158,14 @@
             </div>
         </div>
 
-        <!-- Tabel Transaksi Aktif yang Menggunakan Unit Ini -->
+        <!-- Tabel Transaksi Aktif yang Sedang Disewa di Lapangan -->
         <div class="ac-card mb-4">
             <div class="ac-card-header d-flex justify-content-between align-items-center">
                 <div>
-                    <h3 class="ac-card-title">Unit Sedang Dialokasikan / Disewa</h3>
-                    <small class="text-muted">Daftar transaksi aktif di lapangan</small>
+                    <h3 class="ac-card-title">🏕️ Unit Sedang Disewa di Lapangan</h3>
+                    <small class="text-muted">Unit Sedang Dialokasikan / Disewa &bull; Telah diserahkan ke pelanggan dan belum selesai dikembalikan</small>
                 </div>
-                <span class="badge bg-warning text-dark font-monospace">{{ $stokDialokasikan }} unit</span>
+                <span class="badge bg-warning text-dark font-monospace">{{ $stokSedangDisewa }} unit</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 small">
@@ -162,13 +173,14 @@
                         <tr>
                             <th>No. Transaksi</th>
                             <th>Pelanggan</th>
-                            <th>Unit</th>
+                            <th class="text-center">Diserahkan</th>
+                            <th class="text-center">Belum Kembali</th>
                             <th>Jadwal Sewa</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($alokasiAktif as $detail)
+                        @forelse($sedangDisewaAktif as $detail)
                             <tr>
                                 <td>
                                     <strong class="font-monospace text-dark">{{ $detail->no_transaksi }}</strong>
@@ -176,9 +188,14 @@
                                 <td>
                                     <span class="text-dark fw-bold">{{ $detail->penyewaan->pelanggan->nama_pelanggan ?? '-' }}</span>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge bg-light text-dark border font-monospace">
                                         {{ $detail->jumlah_diserahkan > 0 ? $detail->jumlah_diserahkan : $detail->jumlah }} unit
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle font-monospace fw-bold">
+                                        {{ $detail->jumlah_sisa_kembali }} unit
                                     </span>
                                 </td>
                                 <td>
@@ -190,8 +207,8 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-muted">
-                                    <em>Tidak ada unit yang sedang disewa atau dialokasikan saat ini.</em>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <em>Tidak ada unit yang sedang disewa di lapangan saat ini.</em>
                                 </td>
                             </tr>
                         @endforelse
@@ -200,14 +217,68 @@
             </div>
         </div>
 
+        @if($dialokasikanAktif->isNotEmpty())
+            <!-- Tabel Transaksi yang Dialokasikan di Toko tapi Belum Diambil -->
+            <div class="ac-card mb-4 border-info">
+                <div class="ac-card-header bg-info-subtle d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="ac-card-title text-dark">📦 Unit Dialokasikan di Toko / Menunggu Pengambilan</h3>
+                        <small class="text-muted">Unit masih berada di toko, dialokasikan untuk pesanan aktif pelanggan</small>
+                    </div>
+                    <span class="badge bg-info text-dark font-monospace">{{ $stokDialokasikan }} unit</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>No. Transaksi</th>
+                                <th>Pelanggan</th>
+                                <th class="text-center">Dipesan</th>
+                                <th>Jadwal Sewa</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($dialokasikanAktif as $detail)
+                                <tr>
+                                    <td>
+                                        <strong class="font-monospace text-dark">{{ $detail->no_transaksi }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="text-dark fw-bold">{{ $detail->penyewaan->pelanggan->nama_pelanggan ?? '-' }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle font-monospace">
+                                            {{ $detail->jumlah }} unit
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span>{{ \Carbon\Carbon::parse($detail->penyewaan->tanggal_sewa)->format('d/m/Y') }} &rarr; {{ \Carbon\Carbon::parse($detail->penyewaan->tanggal_kembali)->format('d/m/Y') }}</span>
+                                    </td>
+                                    <td>
+                                        <x-status-badge :status="$detail->penyewaan->status_penyewaan" />
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
         <!-- Section Unit Menunggu Konfirmasi Selesai Perbaikan -->
         <div class="ac-card mb-4 border-warning">
-            <div class="ac-card-header bg-warning-subtle d-flex justify-content-between align-items-center">
+            <div class="ac-card-header bg-warning-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h3 class="ac-card-title text-dark fs-6 fw-bold mb-0">🔧 Unit Menunggu Konfirmasi Selesai Perbaikan</h3>
                     <small class="text-muted">Unit kembali tersedia di stok siap sewa setelah dikonfirmasi oleh petugas yang berwenang</small>
                 </div>
-                <span class="badge bg-warning text-dark font-monospace">{{ $stokPerluPerbaikan }} unit</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-warning text-dark font-monospace">{{ $stokPerluPerbaikan }} unit</span>
+                    <button type="button" class="btn btn-sm btn-dark d-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalTindakKerusakan" style="font-size:0.75rem;">
+                        <span>⚙️ Tindak Unit / Catat Biaya Servis</span>
+                    </button>
+                </div>
             </div>
             <div class="ac-card-body p-3">
                 @if($alat->kondisi === 'Perlu Perbaikan')
@@ -281,6 +352,68 @@
                     <div class="text-center py-3 text-muted small">
                         <span class="d-block mb-1 fs-5">✅</span>
                         Tidak ada unit yang sedang dalam antrean perbaikan untuk alat ini. Seluruh stok terawat dengan baik.
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <!-- Card Riwayat Penanganan Kerusakan & Biaya Servis -->
+        <div class="ac-card mb-4">
+            <div class="ac-card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="ac-card-title fs-6 fw-bold mb-0">🛠️ Riwayat Penanganan Kerusakan & Biaya Servis</h3>
+                    <small class="text-muted">Catatan tindakan penanganan, servis teknisi, dan biaya perbaikan riil</small>
+                </div>
+                <span class="badge bg-secondary font-monospace">{{ $riwayatPenanganan->count() }} catatan</span>
+            </div>
+            <div class="ac-card-body p-0">
+                @if($riwayatPenanganan->isEmpty())
+                    <div class="text-center py-4 text-muted small">
+                        <span class="d-block mb-1 fs-5">📋</span>
+                        Belum ada riwayat penanganan kerusakan atau pengeluaran biaya perbaikan untuk alat ini.
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Tindakan</th>
+                                    <th class="text-center">Unit</th>
+                                    <th class="text-end">Biaya Servis</th>
+                                    <th>Teknisi / Pelaksana</th>
+                                    <th>Keterangan</th>
+                                    <th>Admin</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($riwayatPenanganan as $log)
+                                    <tr>
+                                        <td>
+                                            <span class="text-dark">{{ \Carbon\Carbon::parse($log->tanggal_tindakan)->format('d/m/Y') }}</span>
+                                        </td>
+                                        <td>
+                                            @if($log->jenis_tindakan === 'Selesai Perbaikan')
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle">✓ Selesai Perbaikan</span>
+                                            @elseif($log->jenis_tindakan === 'Catat Biaya Perbaikan')
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">💵 Catat Biaya</span>
+                                            @elseif($log->jenis_tindakan === 'Afkir/Pensiun')
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">⚠️ Afkir/Pensiun</span>
+                                            @else
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">⏳ Menunggu</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center font-monospace fw-bold">{{ $log->jumlah_unit }} unit</td>
+                                        <td class="text-end font-monospace fw-bold {{ $log->biaya_perbaikan > 0 ? 'text-danger' : 'text-muted' }}">
+                                            Rp {{ number_format($log->biaya_perbaikan, 0, ',', '.') }}
+                                        </td>
+                                        <td>{{ $log->pelaksana_teknisi ?: '-' }}</td>
+                                        <td><span class="text-muted">{{ $log->keterangan ?: '-' }}</span></td>
+                                        <td><small class="text-muted">{{ $log->admin->nama ?? 'Admin' }}</small></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 @endif
             </div>
@@ -402,4 +535,81 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
+<!-- Modal Tindak Kerusakan & Catat Biaya Servis -->
+<div class="modal fade" id="modalTindakKerusakan" tabindex="-1" aria-labelledby="modalTindakKerusakanLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fs-6" id="modalTindakKerusakanLabel">⚙️ Tindak Unit Bermasalah & Biaya Servis: {{ $alat->nama_alat }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('admin.inventaris.tindak-kerusakan', $alat->kode_alat) }}" method="POST" onsubmit="const btn = this.querySelector('button[type=submit]'); if (this.submitted) return false; this.submitted = true; btn.disabled = true; btn.innerText = 'Menyimpan...'; return true;">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Pilih Jenis Tindakan <span class="text-danger">*</span></label>
+                        <select name="jenis_tindakan" class="form-select form-select-sm" required id="selectJenisTindakan">
+                            <option value="Menunggu Perbaikan">⏳ Menunggu Perbaikan (Catat Status Antrean Servis)</option>
+                            <option value="Catat Biaya Perbaikan">💵 Catat Biaya Perbaikan (Catat Pengeluaran Tanpa Mengubah Stok)</option>
+                            <option value="Selesai Perbaikan">✅ Selesai Perbaikan (Kembalikan Unit ke Stok Siap Sewa)</option>
+                            <option value="Afkir/Pensiun">⚠️ Afkir / Pensiunkan Unit (Unit Rusak Parah Dikeluarkan)</option>
+                        </select>
+                    </div>
+
+                    @if($unitPerbaikanList->isNotEmpty())
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-dark">Sumber Unit Transaksi (Opsional)</label>
+                            <select name="id_detail" class="form-select form-select-sm">
+                                <option value="">-- Unit Master Fisik Toko --</option>
+                                @foreach($unitPerbaikanList as $detail)
+                                    @php
+                                        $sisa = max(0, (int) $detail->jumlah_perlu_perbaikan - (int) ($detail->jumlah_diperbaiki ?? 0));
+                                    @endphp
+                                    <option value="{{ $detail->id_detail }}">
+                                        Transaksi {{ $detail->no_transaksi }} &mdash; {{ $detail->penyewaan->pelanggan->nama_pelanggan ?? 'Umum' }} (Sisa: {{ $sisa }} unit)
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-dark">Jumlah Unit <span class="text-danger">*</span></label>
+                            <input type="number" name="jumlah" class="form-control form-control-sm font-monospace" value="1" min="1" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-dark">Tanggal Tindakan <span class="text-danger">*</span></label>
+                            <input type="date" name="tanggal_tindakan" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Biaya Perbaikan / Servis (Rp)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" name="biaya_perbaikan" class="form-control font-monospace" value="0" min="0" step="500" placeholder="0">
+                        </div>
+                        <small class="text-muted" style="font-size:0.75rem;">Masukkan biaya riil yang dibayarkan ke teknisi/bengkel. Akan tercatat pada laporan pengeluaran Pemilik.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Teknisi / Bengkel / Pelaksana</label>
+                        <input type="text" name="pelaksana_teknisi" class="form-control form-control-sm" placeholder="Contoh: Bengkel Outdoor Jaya / Staf Gudang">
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small fw-bold text-dark">Keterangan / Rincian Kerusakan</label>
+                        <textarea name="keterangan" rows="2" class="form-control form-control-sm" placeholder="Contoh: Ganti resleting tenda, penggantian frame patah, pembersihan jamur..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-primary px-3">Simpan Tindakan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection

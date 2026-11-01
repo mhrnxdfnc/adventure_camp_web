@@ -1,20 +1,18 @@
 <?php
 
-include "koneksi.php";
+include 'koneksi.php';
 
 $data = [];
 
-
-
 /* TOTAL PELANGGAN */
 
-$result = $conn->query("
+$result = $conn->query('
     SELECT COUNT(*) AS total
     FROM pelanggan
-");
+');
 
-$data["total_pelanggan"] =
-    (int)$result->fetch_assoc()["total"];
+$data['total_pelanggan'] =
+    (int) $result->fetch_assoc()['total'];
 
 /* TOTAL STOK */
 
@@ -24,9 +22,8 @@ $result = $conn->query("
     WHERE kondisi != 'Rusak'
 ");
 
-$data["total_alat"] =
-    (int)$result->fetch_assoc()["total"];
-
+$data['total_alat'] =
+    (int) $result->fetch_assoc()['total'];
 
 /* TRANSAKSI AKTIF */
 
@@ -36,9 +33,8 @@ $result = $conn->query("
     WHERE status_penyewaan = 'Berjalan'
 ");
 
-$data["transaksi_aktif"] =
-    (int)$result->fetch_assoc()["total"];
-
+$data['transaksi_aktif'] =
+    (int) $result->fetch_assoc()['total'];
 
 /* TERLAMBAT */
 
@@ -49,9 +45,8 @@ $result = $conn->query("
     AND tanggal_kembali < CURDATE()
 ");
 
-$data["terlambat"] =
-    (int)$result->fetch_assoc()["total"];
-
+$data['terlambat'] =
+    (int) $result->fetch_assoc()['total'];
 
 /* PENDAPATAN */
 
@@ -66,13 +61,12 @@ $result = $conn->query("
     AND YEAR(tanggal_pembayaran) = YEAR(CURDATE())
 ");
 
-$data["pendapatan_bulan"] =
-    (float)$result->fetch_assoc()["total"];
-
+$data['pendapatan_bulan'] =
+    (float) $result->fetch_assoc()['total'];
 
 /* TRANSAKSI TERBARU */
 
-$result = $conn->query("
+$result = $conn->query('
     SELECT
         p.no_transaksi,
         pl.nama_pelanggan,
@@ -84,14 +78,13 @@ $result = $conn->query("
         ON p.id_pelanggan = pl.id_pelanggan
     ORDER BY p.tanggal_sewa DESC
     LIMIT 7
-");
+');
 
-$data["terbaru"] = [];
+$data['terbaru'] = [];
 
 while ($row = $result->fetch_assoc()) {
-    $data["terbaru"][] = $row;
+    $data['terbaru'][] = $row;
 }
-
 
 /* GRAFIK TRANSAKSI BULANAN */
 
@@ -105,16 +98,15 @@ $result = $conn->query("
     LIMIT 6
 ");
 
-$data["grafik_transaksi"] = [];
+$data['grafik_transaksi'] = [];
 
 while ($row = $result->fetch_assoc()) {
-    $data["grafik_transaksi"][] = $row;
+    $data['grafik_transaksi'][] = $row;
 }
-
 
 /* GRAFIK ALAT TERLARIS */
 
-$result = $conn->query("
+$result = $conn->query('
     SELECT
         a.nama_alat,
         SUM(d.jumlah) AS total
@@ -126,18 +118,17 @@ $result = $conn->query("
     GROUP BY a.kode_alat, a.nama_alat
     ORDER BY total DESC
     LIMIT 5
-");
+');
 
-$data["alat_terlaris"] = [];
+$data['alat_terlaris'] = [];
 
 while ($row = $result->fetch_assoc()) {
-    $data["alat_terlaris"][] = $row;
+    $data['alat_terlaris'][] = $row;
 }
 
-
 echo json_encode([
-    "status" => "success",
-    "data" => $data
+    'status' => 'success',
+    'data' => $data,
 ]);
 
 $conn->close();

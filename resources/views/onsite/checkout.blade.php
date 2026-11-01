@@ -33,7 +33,8 @@
                                    value="{{ old('tanggal_sewa', $tanggalSewaDefault) }}" 
                                    min="{{ date('Y-m-d') }}" 
                                    required 
-                                   onchange="onTanggalSewaChange()">
+                                   onchange="onTanggalSewaChange()"
+                                   oninput="onTanggalSewaChange()">
                             @error('tanggal_sewa')
                                 <small class="text-danger d-block mt-1">{{ $message }}</small>
                             @enderror
@@ -50,7 +51,8 @@
                                    value="{{ old('tanggal_kembali', $tanggalKembaliDefault) }}" 
                                    min="{{ date('Y-m-d', strtotime('+1 day')) }}" 
                                    required 
-                                   onchange="hitungSemuaBiaya()">
+                                   onchange="hitungSemuaBiaya()"
+                                   oninput="hitungSemuaBiaya()">
                             @error('tanggal_kembali')
                                 <small class="text-danger d-block mt-1">{{ $message }}</small>
                             @enderror
@@ -233,7 +235,7 @@
                                             {{ $item['jumlah'] }} unit
                                         </td>
                                         <td class="text-end fw-bold font-monospace small text-dark item-subtotal" id="subtotal_{{ $item['kode_alat'] }}">
-                                            Rp {{ number_format($item['tarif_sewa'] * $item['jumlah'] * $durasiDefault, 0, ',', '.') }}
+                                            Rp {{ number_format(\App\Models\Penyewaan::hitungTotalBiaya($item['tarif_sewa'], $item['jumlah'], $durasiDefault), 0, ',', '.') }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -350,6 +352,12 @@
             }
         });
 
+        const labelTotal = document.getElementById('labelTotalTransaksi');
+        if (labelTotal) {
+            labelTotal.textContent = formatRupiah(grandTotal);
+        }
+    }
+
     let registeredCustomerInfo = null;
 
     function cekNomorPelanggan() {
@@ -424,7 +432,21 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        const sewaInput = document.getElementById('tanggalSewa');
+        const kembaliInput = document.getElementById('tanggalKembali');
+
+        if (sewaInput) {
+            sewaInput.addEventListener('change', onTanggalSewaChange);
+            sewaInput.addEventListener('input', onTanggalSewaChange);
+        }
+
+        if (kembaliInput) {
+            kembaliInput.addEventListener('change', hitungSemuaBiaya);
+            kembaliInput.addEventListener('input', hitungSemuaBiaya);
+        }
+
         hitungSemuaBiaya();
+
         const phoneInput = document.getElementById('nomorTelepon');
         if (phoneInput && phoneInput.value.trim().length >= 8) {
             cekNomorPelanggan();

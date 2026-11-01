@@ -202,6 +202,33 @@ class AdminUserController extends Controller
     }
 
     /**
+     * Tampilkan rincian detail akun pengguna
+     */
+    public function show(User $user): View
+    {
+        $user->load(['pelanggan.penyewaan' => function ($query) {
+            $query->latest('created_at')->take(10);
+        }, 'activityLogs' => function ($query) {
+            $query->latest('waktu')->take(15);
+        }]);
+
+        $isLastAdmin = $this->isLastActiveAdmin($user);
+        $isCurrentAdmin = (int) $user->id_user === (int) Auth::id();
+
+        // Hitung total transaksi penyewaan jika role Pengguna
+        $totalTransaksi = $user->pelanggan?->penyewaan()->count() ?? 0;
+        $totalAktivitas = $user->activityLogs()->count();
+
+        return view('admin.users.show', [
+            'user' => $user,
+            'isLastAdmin' => $isLastAdmin,
+            'isCurrentAdmin' => $isCurrentAdmin,
+            'totalTransaksi' => $totalTransaksi,
+            'totalAktivitas' => $totalAktivitas,
+        ]);
+    }
+
+    /**
      * Tampilkan formulir edit akun pengguna
      */
     public function edit(User $user): View

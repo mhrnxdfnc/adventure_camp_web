@@ -457,4 +457,37 @@ class AdminPesananQueueTest extends TestCase
         Pembayaran::where('no_transaksi', $noTrx)->delete();
         Penyewaan::where('no_transaksi', $noTrx)->delete();
     }
+
+    /**
+     * Pesanan yang pembayarannya sudah Lunas langsung menjadi Siap Diambil ketika stok disetujui
+     */
+    public function test_order_approved_with_lunas_payment_becomes_siap_diambil_immediately(): void
+    {
+        $noTrx = 'TRX-TEST-PAID-001';
+        $penyewaan = $this->createPesananTest($noTrx, 'on-site', 'Cash', 'Menunggu Konfirmasi', 'Lunas');
+
+        // Sebelum persetujuan
+        $this->assertEquals('Menunggu Konfirmasi', $penyewaan->status_penyewaan);
+        $this->assertEquals('Lunas', $penyewaan->status_pembayaran);
+
+        // Setelah disetujui Admin (konfirmasi stok)
+        $res = $this->actingAs($this->adminUser)->post(route('admin.pesanan.setujui', $noTrx));
+        $res->assertSessionHas('success');
+
+        $penyewaan->refresh();
+
+        // Status pesanan harus langsung Siap Diambil karena sudah lunas
+        $this->assertEquals('Siap Diambil', $penyewaan->status_penyewaan);
+        $this->assertTrue($penyewaan->isSiapDiambil());
+
+        // Verifikasi muncul di antrean penyerahan alat
+        $pickupRes = $this->actingAs($this->adminUser)->get(route('admin.operasional.pengambilan'));
+        $pickupRes->assertStatus(200);
+        $pickupRes->assertSee($noTrx);
+
+        // Bersihkan
+        DetailPenyewaan::where('no_transaksi', $noTrx)->delete();
+        Pembayaran::where('no_transaksi', $noTrx)->delete();
+        Penyewaan::where('no_transaksi', $noTrx)->delete();
+    }
 }

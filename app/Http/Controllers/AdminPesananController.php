@@ -128,8 +128,9 @@ class AdminPesananController extends Controller
                     }
                 }
 
-                // 5. Ubah status pesanan menjadi Menunggu Pembayaran
-                $trx->status_penyewaan = 'Menunggu Pembayaran';
+                // 5. Ubah status pesanan: jika pembayaran sudah lunas, langsung Siap Diambil; jika belum, Menunggu Pembayaran
+                $isPaid = ($trx->pembayaran && $trx->pembayaran->isLunas());
+                $trx->status_penyewaan = $isPaid ? 'Siap Diambil' : 'Menunggu Pembayaran';
                 $trx->save();
 
                 // 6. Siapkan instruksi pembayaran berdasarkan metode pilihan pelanggan
@@ -143,7 +144,7 @@ class AdminPesananController extends Controller
                     Auth::id(),
                     'Persetujuan Pesanan',
                     'Penyewaan',
-                    "No Transaksi: {$trx->no_transaksi}, Pelanggan: {$namaPelanggan}, Sumber: {$sumber}, Metode: {$metodePembayaran}, Status: Menunggu Pembayaran"
+                    "No Transaksi: {$trx->no_transaksi}, Pelanggan: {$namaPelanggan}, Sumber: {$sumber}, Metode: {$metodePembayaran}, Status: {$trx->status_penyewaan}"
                 );
             });
 
@@ -152,7 +153,12 @@ class AdminPesananController extends Controller
             session()->flash('metode_pembayaran', $metodePembayaran);
             session()->flash('transaksi_disetujui', $no_transaksi);
 
-            return back()->with('success', "Pesanan {$no_transaksi} berhasil disetujui. {$instruksi}");
+            $pesananFresh = Penyewaan::find($no_transaksi);
+            $suksesMsg = ($pesananFresh && $pesananFresh->status_penyewaan === 'Siap Diambil')
+                ? "Pesanan {$no_transaksi} berhasil disetujui. Karena pembayaran telah diverifikasi Lunas, pesanan kini berstatus Siap Diambil dan dapat langsung diserahkan kepada pelanggan."
+                : "Pesanan {$no_transaksi} berhasil disetujui. {$instruksi}";
+
+            return back()->with('success', $suksesMsg);
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
         }
